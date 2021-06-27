@@ -2,40 +2,40 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://georgehao.github.io/gohandbook.github.io/zh/categories/</loc>
+    <loc>https://gohandbook.haohongfan.com/zh/categories/</loc>
     <xhtml:link
                 rel="alternate"
                 hreflang="en"
-                href="https://georgehao.github.io/gohandbook.github.io/categories/"
+                href="https://gohandbook.haohongfan.com/categories/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="zh"
-                href="https://georgehao.github.io/gohandbook.github.io/zh/categories/"
+                href="https://gohandbook.haohongfan.com/zh/categories/"
                 />
   </url><url>
-    <loc>https://georgehao.github.io/gohandbook.github.io/zh/</loc>
+    <loc>https://gohandbook.haohongfan.com/zh/</loc>
     <xhtml:link
                 rel="alternate"
                 hreflang="en"
-                href="https://georgehao.github.io/gohandbook.github.io/"
+                href="https://gohandbook.haohongfan.com/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="zh"
-                href="https://georgehao.github.io/gohandbook.github.io/zh/"
+                href="https://gohandbook.haohongfan.com/zh/"
                 />
   </url><url>
-    <loc>https://georgehao.github.io/gohandbook.github.io/zh/tags/</loc>
+    <loc>https://gohandbook.haohongfan.com/zh/tags/</loc>
     <xhtml:link
                 rel="alternate"
                 hreflang="en"
-                href="https://georgehao.github.io/gohandbook.github.io/tags/"
+                href="https://gohandbook.haohongfan.com/tags/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="zh"
-                href="https://georgehao.github.io/gohandbook.github.io/zh/tags/"
+                href="https://gohandbook.haohongfan.com/zh/tags/"
                 />
   </url>
 </urlset>
