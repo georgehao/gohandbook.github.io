@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Go sync.Pool 浅析 #  hi, 大家好，我是 haohongfan。
+sync.Pool 应该是 Go 里面明星级别的数据结构，有很多优秀的文章都在介绍这个结构，本篇文章简单剖析下 sync.Pool。不过说实话 sync.Pool 并不是我们日常开发中使用频率很高的的并发原语。
+尽管用的频率很低，但是不可否认的是 sync.Pool 确实是 Go 的杀手锏，合理使用 sync.Pool 会让我们的程序性能飙升。本篇文章会从使用方式，源码剖析，运用场景等方面，让你对 sync.Pool 有一个清晰的认知。
+使用方式 #  sync.Pool 使用很简单，但是想用对却很麻烦，因为你有可能看到网上一堆错误的示例，各位同学在搜索 sync.Pool 的使用例子时，要特别注意。
+sync.Pool 是一个内存池。通常内存池是用来防止内存泄露的（例如C/C&#43;&#43;)。sync.Pool 这个内存池却不是干这个的，带 GC 功能的语言都存在垃圾回收 STW 问题，需要回收的内存块越多，STW 持续时间就越长。如果能让 new 出来的变量，一直不被回收，得到重复利用，是不是就减轻了 GC 的压力。
+正确的使用示例（下面的demo选自gin）
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) { c := engine.pool.Get().(*Context) c.writermem.reset(w) c.Request = req c.reset() engine.handleHTTPRequest(c) engine.pool.Put(c) } 一定要注意的是：是先 Get 获取内存空间，基于这个内存做相关的处理，然后再将这个内存还回（Put）到 sync.Pool。
+Pool 结构 #   源码图解 #    简单点可以总结成下面的流程：">
+<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="sync.Pool" />
+<meta property="og:description" content="Go sync.Pool 浅析 #  hi, 大家好，我是 haohongfan。
+sync.Pool 应该是 Go 里面明星级别的数据结构，有很多优秀的文章都在介绍这个结构，本篇文章简单剖析下 sync.Pool。不过说实话 sync.Pool 并不是我们日常开发中使用频率很高的的并发原语。
+尽管用的频率很低，但是不可否认的是 sync.Pool 确实是 Go 的杀手锏，合理使用 sync.Pool 会让我们的程序性能飙升。本篇文章会从使用方式，源码剖析，运用场景等方面，让你对 sync.Pool 有一个清晰的认知。
+使用方式 #  sync.Pool 使用很简单，但是想用对却很麻烦，因为你有可能看到网上一堆错误的示例，各位同学在搜索 sync.Pool 的使用例子时，要特别注意。
+sync.Pool 是一个内存池。通常内存池是用来防止内存泄露的（例如C/C&#43;&#43;)。sync.Pool 这个内存池却不是干这个的，带 GC 功能的语言都存在垃圾回收 STW 问题，需要回收的内存块越多，STW 持续时间就越长。如果能让 new 出来的变量，一直不被回收，得到重复利用，是不是就减轻了 GC 的压力。
+正确的使用示例（下面的demo选自gin）
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) { c := engine.pool.Get().(*Context) c.writermem.reset(w) c.Request = req c.reset() engine.handleHTTPRequest(c) engine.pool.Put(c) } 一定要注意的是：是先 Get 获取内存空间，基于这个内存做相关的处理，然后再将这个内存还回（Put）到 sync.Pool。
+Pool 结构 #   源码图解 #    简单点可以总结成下面的流程：" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-22-sync-pool/" /><meta property="article:section" content="docs" />
+
+<meta property="article:modified_time" content="2021-06-25T17:20:28&#43;08:00" />
+
+<title>sync.Pool | Go 源码分析与实战</title>
+<link rel="manifest" href="/gohandbook.github.io/manifest.json">
+<link rel="icon" href="/gohandbook.github.io/favicon.png" type="image/x-icon">
+<link rel="stylesheet" href="/gohandbook.github.io/book.min.cf5d90d8574af1f10c485912bafecea50887593048830a5d1be5ac171dba0b42.css" integrity="sha256-z12Q2FdK8fEMSFkSuv7OpQiHWTBIgwpdG&#43;WsFx26C0I=" crossorigin="anonymous">
+  <script defer src="/gohandbook.github.io/flexsearch.min.js"></script>
+  <script defer src="/gohandbook.github.io/en.search.min.9879573fd40404498807413e7d87bb8fcbf6e2072a630a8d4789df9cdd48d060.js" integrity="sha256-mHlXP9QEBEmIB0E&#43;fYe7j8v24gcqYwqNR4nfnN1I0GA=" crossorigin="anonymous"></script>
+
+  <script defer src="/gohandbook.github.io/sw.min.81844b0756fc2ca3d283412f4c3cf8974f28a676397d293a5a34a3cbf3801244.js" integrity="sha256-gYRLB1b8LKPSg0EvTDz4l08opnY5fSk6WjSjy/OAEkQ=" crossorigin="anonymous"></script>
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a href="/gohandbook.github.io/"><span>Go 源码分析与实战</span>
+  </a>
+</h2>
+
+
+<div class="book-search">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+
+
+
+
+
+
+  
+<ul>
+  
+  <li>
+    <a href="https://www.haohongfan.com" target="_blank" rel="noopener">
+        HHFCodeRv 博客
+      </a>
+  </li>
+  
+</ul>
+
+
+
+
+
+
+
+  <hr />
+<br />
+<ul>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/rand-chapter/">随时数</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/rand-chapter/2021-01-23-rand/">Math/rand</a>
+<br /></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/sync-chapter/">并发原语</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-04-01-mutex/">sync.Mutex</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-cond/">sync.Cond</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-map/">sync.Map</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-waitgroup/">sync.WaitGroup</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-22-sync-pool/"class=active>sync.Pool</a>
+<br /></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/timer-chapter/">定时器</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/timer-chapter/2021-04-01-timer/">Timer</a></li>
+</ul>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var a=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(b){localStorage.setItem("menu.scrollTop",a.scrollTop)}),a.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/gohandbook.github.io/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>sync.Pool</strong>
+
+  <label for="toc-control">
+    
+    <img src="/gohandbook.github.io/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#go-syncpool-浅析">Go sync.Pool 浅析</a>
+      <ul>
+        <li><a href="#使用方式">使用方式</a>
+          <ul>
+            <li><a href="#pool-结构">Pool 结构</a></li>
+          </ul>
+        </li>
+        <li><a href="#源码图解">源码图解</a></li>
+        <li><a href="#syncpool-梳理">Sync.Pool 梳理</a>
+          <ul>
+            <li><a href="#pool-的内容会清理清理会造成数据丢失吗">Pool 的内容会清理？清理会造成数据丢失吗？</a></li>
+            <li><a href="#runtimegomaxprocs-与-pool-之间的关系">runtime.GOMAXPROCS 与 pool 之间的关系？</a></li>
+            <li><a href="#new-的作用假如没有-new-会出现什么情况">New() 的作用？假如没有 New 会出现什么情况？</a></li>
+            <li><a href="#先-put再-get-会出现什么情况">先 Put，再 Get 会出现什么情况？</a></li>
+            <li><a href="#只-get-不-put-会内存泄露吗">只 Get 不 Put 会内存泄露吗？</a></li>
+          </ul>
+        </li>
+        <li><a href="#使用场景">使用场景</a></li>
+        <li><a href="#使用注意点">使用注意点</a></li>
+        <li><a href="#参考链接">参考链接</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown"><h1 id="go-syncpool-浅析">
+  Go sync.Pool 浅析
+  <a class="anchor" href="#go-syncpool-%e6%b5%85%e6%9e%90">#</a>
+</h1>
+<p>hi, 大家好，我是 haohongfan。</p>
+<p>sync.Pool 应该是 Go 里面明星级别的数据结构，有很多优秀的文章都在介绍这个结构，本篇文章简单剖析下 sync.Pool。不过说实话 sync.Pool 并不是我们日常开发中使用频率很高的的并发原语。</p>
+<p>尽管用的频率很低，但是不可否认的是 sync.Pool 确实是 Go 的杀手锏，合理使用 sync.Pool 会让我们的程序性能飙升。本篇文章会从使用方式，源码剖析，运用场景等方面，让你对 sync.Pool 有一个清晰的认知。</p>
+<h2 id="使用方式">
+  使用方式
+  <a class="anchor" href="#%e4%bd%bf%e7%94%a8%e6%96%b9%e5%bc%8f">#</a>
+</h2>
+<p>sync.Pool 使用很简单，但是想用对却很麻烦，因为你有可能看到网上一堆错误的示例，各位同学在搜索 sync.Pool 的使用例子时，要特别注意。</p>
+<p>sync.Pool 是一个内存池。通常内存池是用来防止内存泄露的（例如C/C++)。sync.Pool 这个内存池却不是干这个的，带 GC 功能的语言都存在垃圾回收 STW 问题，需要回收的内存块越多，STW 持续时间就越长。如果能让 new 出来的变量，一直不被回收，得到重复利用，是不是就减轻了 GC 的压力。</p>
+<p>正确的使用示例（下面的demo选自gin）</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">engine</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">Engine</span>) <span style="color:#a6e22e">ServeHTTP</span>(<span style="color:#a6e22e">w</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">ResponseWriter</span>, <span style="color:#a6e22e">req</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Request</span>) {
+	<span style="color:#a6e22e">c</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">engine</span>.<span style="color:#a6e22e">pool</span>.<span style="color:#a6e22e">Get</span>().(<span style="color:#f92672">*</span><span style="color:#a6e22e">Context</span>)
+	<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">writermem</span>.<span style="color:#a6e22e">reset</span>(<span style="color:#a6e22e">w</span>)
+	<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Request</span> = <span style="color:#a6e22e">req</span>
+	<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">reset</span>()
+	<span style="color:#a6e22e">engine</span>.<span style="color:#a6e22e">handleHTTPRequest</span>(<span style="color:#a6e22e">c</span>)
+	<span style="color:#a6e22e">engine</span>.<span style="color:#a6e22e">pool</span>.<span style="color:#a6e22e">Put</span>(<span style="color:#a6e22e">c</span>)
+}
+</code></pre></div><p>一定要注意的是：是先 Get 获取内存空间，基于这个内存做相关的处理，然后再将这个内存还回（Put）到 sync.Pool。</p>
+<h3 id="pool-结构">
+  Pool 结构
+  <a class="anchor" href="#pool-%e7%bb%93%e6%9e%84">#</a>
+</h3>
+<p>
+  <img src="https://images.haohongfan.com/sync_pool_all1.png" alt="sync.Pool 全景图" /></p>
+<h2 id="源码图解">
+  源码图解
+  <a class="anchor" href="#%e6%ba%90%e7%a0%81%e5%9b%be%e8%a7%a3">#</a>
+</h2>
+<p>
+  <img src="https://images.haohongfan.com/sync_pool_get1.png" alt="sync_pool_get1.png" /></p>
+<p>
+  <img src="https://images.haohongfan.com/sync_pool_put1.png" alt="sync_pool_put1.png" /></p>
+<p>简单点可以总结成下面的流程：</p>
+<p>
+  <img src="https://images.haohongfan.com/sync_pool_get_flow2.png" alt="sync_pool_get_flow2.png" /></p>
+<p>
+  <img src="https://images.haohongfan.com/sync_pool_put_flow.png" alt="sync_pool_put_flow2.png" /></p>
+<p>
+  <img src="https://images.haohongfan.com/sync_pool_gc2.png" alt="sync_pool_gc1.png" /></p>
+<h2 id="syncpool-梳理">
+  Sync.Pool 梳理
+  <a class="anchor" href="#syncpool-%e6%a2%b3%e7%90%86">#</a>
+</h2>
+<h3 id="pool-的内容会清理清理会造成数据丢失吗">
+  Pool 的内容会清理？清理会造成数据丢失吗？
+  <a class="anchor" href="#pool-%e7%9a%84%e5%86%85%e5%ae%b9%e4%bc%9a%e6%b8%85%e7%90%86%e6%b8%85%e7%90%86%e4%bc%9a%e9%80%a0%e6%88%90%e6%95%b0%e6%8d%ae%e4%b8%a2%e5%a4%b1%e5%90%97">#</a>
+</h3>
+<p>Go 会在每个 GC 周期内定期清理 sync.Pool 内的数据。</p>
+<p>要分几个方面来说这个问题。</p>
+<ol>
+<li>已经从 sync.Pool Get 的值，在 poolClean 时虽说将 pool.local 置成了nil，Get 到的值依然是有效的，是被 GC 标记为黑色的，不会被 GC回收，当 Put 后又重新加入到 sync.Pool 中</li>
+<li>在第一个 GC 周期内 Put 到 sync.Pool 的数值，在第二个 GC 周期没有被 Get 使用，就会被放在 local.victim 中。如果在 第三个 GC 周期仍然没有被使用就会被 GC 回收。</li>
+</ol>
+<h3 id="runtimegomaxprocs-与-pool-之间的关系">
+  runtime.GOMAXPROCS 与 pool 之间的关系？
+  <a class="anchor" href="#runtimegomaxprocs-%e4%b8%8e-pool-%e4%b9%8b%e9%97%b4%e7%9a%84%e5%85%b3%e7%b3%bb">#</a>
+</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#a6e22e">s</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">localSize</span>
+<span style="color:#a6e22e">l</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">local</span>
+<span style="color:#66d9ef">if</span> uintptr(<span style="color:#a6e22e">pid</span>) &lt; <span style="color:#a6e22e">s</span> {
+    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">indexLocal</span>(<span style="color:#a6e22e">l</span>, <span style="color:#a6e22e">pid</span>), <span style="color:#a6e22e">pid</span>
+}
+
+<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">local</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+    <span style="color:#a6e22e">allPools</span> = append(<span style="color:#a6e22e">allPools</span>, <span style="color:#a6e22e">p</span>)
+}
+<span style="color:#75715e">// If GOMAXPROCS changes between GCs, we re-allocate the array and lose the old one.
+</span><span style="color:#75715e"></span><span style="color:#a6e22e">size</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">runtime</span>.<span style="color:#a6e22e">GOMAXPROCS</span>(<span style="color:#ae81ff">0</span>)
+<span style="color:#a6e22e">local</span> <span style="color:#f92672">:=</span> make([]<span style="color:#a6e22e">poolLocal</span>, <span style="color:#a6e22e">size</span>)
+<span style="color:#a6e22e">atomic</span>.<span style="color:#a6e22e">StorePointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">local</span>, <span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">local</span>[<span style="color:#ae81ff">0</span>])) <span style="color:#75715e">// store-release
+</span><span style="color:#75715e"></span><span style="color:#a6e22e">runtime_StoreReluintptr</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">localSize</span>, uintptr(<span style="color:#a6e22e">size</span>))     <span style="color:#75715e">// store-release
+</span></code></pre></div><p>runtime.GOMAXPROCS(0) 是获取当前最大的 p 的数量。sync.Pool 的 poolLocal 数量受 p 的数量影响，会开辟 runtime.GOMAXPROCS(0) 个 poolLocal。某些场景下我们会使用 runtime.GOMAXPROCS（N) 来改变 p 的数量，会使 sync.Pool 的 pool.poolLocal 释放重新开辟新的空间。</p>
+<p>为什么要开辟 runtime.GOMAXPROCS 个 local？</p>
+<p>pool.local 是个 poolLocal 结构，这个结构体是 private + shared链表组成，在多 goroutine 的 Get/Put 下是有数据竞争的，如果只有一个 local 就需要加锁来操作。每个 p 的 local 就能减少加锁造成的数据竞争问题。</p>
+<h3 id="new-的作用假如没有-new-会出现什么情况">
+  New() 的作用？假如没有 New 会出现什么情况？
+  <a class="anchor" href="#new-%e7%9a%84%e4%bd%9c%e7%94%a8%e5%81%87%e5%a6%82%e6%b2%a1%e6%9c%89-new-%e4%bc%9a%e5%87%ba%e7%8e%b0%e4%bb%80%e4%b9%88%e6%83%85%e5%86%b5">#</a>
+</h3>
+<p>从上面的 pool.Get 流程图可以看出来，从 sync.Pool 获取一个内存会尝试从当前 private，shared，其他的 p 的 shared 获取或者 victim 获取，如果实在获取不到时，才会调用 New 函数来获取。也就是 New() 函数才是真正开辟内存空间的。New() 开辟出来的的内存空间使用完毕后，调用 pool.Put 函数放入到 sync.Pool 中被重复利用。</p>
+<p>如果 New 函数没有被初始化会怎样呢？很明显，sync.Pool 就废掉了，因为没有了初始化内存的地方了。</p>
+<h3 id="先-put再-get-会出现什么情况">
+  先 Put，再 Get 会出现什么情况？
+  <a class="anchor" href="#%e5%85%88-put%e5%86%8d-get-%e4%bc%9a%e5%87%ba%e7%8e%b0%e4%bb%80%e4%b9%88%e6%83%85%e5%86%b5">#</a>
+</h3>
+<p><strong>一定要注意，下面这个例子的用法是错误的</strong></p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>(){
+    <span style="color:#a6e22e">pool</span><span style="color:#f92672">:=</span> <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">Pool</span>{
+        <span style="color:#a6e22e">New</span>: <span style="color:#66d9ef">func</span>() <span style="color:#66d9ef">interface</span>{} {
+            <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">item</span>{}
+        },
+    }
+    <span style="color:#a6e22e">pool</span>.<span style="color:#a6e22e">Put</span>(<span style="color:#a6e22e">item</span>{<span style="color:#a6e22e">value</span>:<span style="color:#ae81ff">1</span>})
+    <span style="color:#a6e22e">data</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">pool</span>.<span style="color:#a6e22e">Get</span>()
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#a6e22e">data</span>)
+}
+</code></pre></div><p>如果你直接跑这个例子，能得到你想像的结果，但是在某些情况下就不是这个结果了。</p>
+<p>在 Pool.Get 注释里面有这么一句话：“Callers should not assume any relation between values passed to Put and the values returned by Get.”，告诉我们不能把值 Pool.Put 到 sync.Pool 中，再使用 Pool.Get 取出来，因为 sync.Pool 不是 map 或者 slice，放入的值是有可能拿不到的，sync.Pool 的数据结构就不支持做这个事情。</p>
+<p>前面说使用 sync.Pool 容易被错误示例误导，就是上面这个写法。为什么 Put 的值 再 Get 会出现问题？</p>
+<ul>
+<li>情况1：sync.Pool 的 poolCleanup 函数在系统 GC 时会被调用，Put 到 sync.Pool 的值，由于有可能一直得不到利用，被在某个 GC 周期内就有可能被释放掉了。</li>
+<li>情况2：不同的 goroutine 绑定的 p 有可能是不一样的，当前 p 对应的 goroutine 放入到 sync.Pool 的值有可能被其他的 p 对应的 goroutine 取到，导致当前 goroutine 再也取不到这个值。</li>
+<li>情况3：使用 runtime.GOMAXPROCS（N) 来改变 p 的数量，会使 sync.Pool 的 pool.poolLocal 释放重新开辟新的空间，导致 sync.Pool 被释放掉。</li>
+<li>情况4：还有很多情况</li>
+</ul>
+<h3 id="只-get-不-put-会内存泄露吗">
+  只 Get 不 Put 会内存泄露吗？
+  <a class="anchor" href="#%e5%8f%aa-get-%e4%b8%8d-put-%e4%bc%9a%e5%86%85%e5%ad%98%e6%b3%84%e9%9c%b2%e5%90%97">#</a>
+</h3>
+<p>使用其他的池，如连接池，如果取连接使用后不放回连接池，就会出现连接池泄露，<strong>是不是 sync.Pool 也有这个问题呢？</strong></p>
+<p>通过上面的流程图，可以看出来 Pool.Get 的时候会尝试从当前 private，shared，其他的 p 的 shared 获取或者 victim 获取，如果实在获取不到时，才会调用 New 函数来获取，New 出来的内容本身还是受系统 GC 来控制的。所以如果我们提供的 New 实现不存在内存泄露的话，那么 sync.Pool 是不会内存泄露的。当 New 出来的变量如果不再被使用，就会被系统 GC 给回收掉。</p>
+<p>如果不 Put 回 sync.Pool，会造成 Get 的时候每次都调用的 New 来从堆栈申请空间，达不到减轻 GC 压力。</p>
+<h2 id="使用场景">
+  使用场景
+  <a class="anchor" href="#%e4%bd%bf%e7%94%a8%e5%9c%ba%e6%99%af">#</a>
+</h2>
+<p>上面说到 sync.Pool 业务开发中不是一个常用结构，我们业务开发中没必要假想某块代码会有强烈的性能问题，一上来就用 sync.Pool 硬怼。 sync.Pool 主要是为了解决 Go GC 压力过大问题的，所以一般情况下，当线上高并发业务出现 GC 问题需要被优化时，才需要用 sync.Pool 出场。</p>
+<h2 id="使用注意点">
+  使用注意点
+  <a class="anchor" href="#%e4%bd%bf%e7%94%a8%e6%b3%a8%e6%84%8f%e7%82%b9">#</a>
+</h2>
+<ol>
+<li>sync.Pool 同样不能被复制。</li>
+<li>好的使用习惯，从 pool.Get 出来的值进行数据的清空（reset），防止垃圾数据污染。</li>
+</ol>
+<blockquote>
+<p>本文基于的 Go 源码版本：1.16.2</p>
+</blockquote>
+<h2 id="参考链接">
+  参考链接
+  <a class="anchor" href="#%e5%8f%82%e8%80%83%e9%93%be%e6%8e%a5">#</a>
+</h2>
+<ol>
+<li>深度解密 Go 语言之 sync.Pool 
+  <a href="https://www.cnblogs.com/qcrao-2018/p/12736031.html">https://www.cnblogs.com/qcrao-2018/p/12736031.html</a></li>
+<li>请问sync.Pool有什么缺点？
+  <a href="https://mp.weixin.qq.com/s/2ZC1BWTylIZMmuQ3HwrnUg">https://mp.weixin.qq.com/s/2ZC1BWTylIZMmuQ3HwrnUg</a></li>
+<li>Go 1.13中 sync.Pool 是如何优化的? 
+  <a href="https://colobu.com/2019/10/08/how-is-sync-Pool-improved-in-Go-1-13/">https://colobu.com/2019/10/08/how-is-sync-Pool-improved-in-Go-1-13/</a></li>
+</ol>
+<p>sync.Pool 的剖析到这里基本就写完了，想跟我交流的可以在评论区留言。</p>
+<p>更多学习学习资料分享，关注公众号回复指令：</p>
+<ul>
+<li>回复 0，获取 《Go 面经》</li>
+<li>回复 1，获取 《Go 源码流程图》</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/me.png" alt="" /></p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+  
+
+
+
+  
+    
+  
+    
+  
+
+
+
+<div class="book-languages" tabindex="0" aria-haspopup="true">
+  <ul>
+    <li class="flex align-center">
+      <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+      English
+    </li> 
+  </ul>
+
+  <ul class="book-languages-list">
+    
+    <li class="">
+      <a href="https://georgehao.github.io/gohandbook.github.io/zh/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        Chinese
+      </a>
+    </li>
+    
+    <li class="active">
+      <a href="https://georgehao.github.io/gohandbook.github.io/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        English
+      </a>
+    </li>
+    
+  </ul>
+</div>
+
+
+
+
+  <div><a class="flex align-center" href="https://github.com/alex-shpak/hugo-book/commit/73a0218380c66a9990643d82e57051460c2cf2d0" title='Last modified by georgehao | June 25, 2021' target="_blank" rel="noopener">
+      <img src="/gohandbook.github.io/svg/calendar.svg" class="book-icon" alt="Calendar" />
+      <span>June 25, 2021</span>
+    </a>
+  </div>
+
+
+
+</div>
+
+
+
+  <script>(function(){function a(c){const a=window.getSelection(),b=document.createRange();b.selectNodeContents(c),a.removeAllRanges(),a.addRange(b)}document.querySelectorAll("pre code").forEach(b=>{b.addEventListener("click",function(c){a(b.parentElement),navigator.clipboard&&navigator.clipboard.writeText(b.parentElement.textContent)})})})()</script>
+
+
+<footer id="footer">
+    <div class="container">
+		<div>
+		以上内容均不得复制用于商业用途或发行
+		</div>
+		<br/>
+        &copy; 2015-2021, By haohongfan Licensed under CC-BY-NC-ND 4.0</a>。
+        备案号：<a href="http://www.beian.miit.gov.cn" target="_blank">京ICP备17041575号</a>
+        
+    </div>
+</footer>
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+
+<br>
+<hr color="#D6D6D6" size=0>
+<script src="https://utteranc.es/client.js"
+        repo="georgehao/oblog"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#go-syncpool-浅析">Go sync.Pool 浅析</a>
+      <ul>
+        <li><a href="#使用方式">使用方式</a>
+          <ul>
+            <li><a href="#pool-结构">Pool 结构</a></li>
+          </ul>
+        </li>
+        <li><a href="#源码图解">源码图解</a></li>
+        <li><a href="#syncpool-梳理">Sync.Pool 梳理</a>
+          <ul>
+            <li><a href="#pool-的内容会清理清理会造成数据丢失吗">Pool 的内容会清理？清理会造成数据丢失吗？</a></li>
+            <li><a href="#runtimegomaxprocs-与-pool-之间的关系">runtime.GOMAXPROCS 与 pool 之间的关系？</a></li>
+            <li><a href="#new-的作用假如没有-new-会出现什么情况">New() 的作用？假如没有 New 会出现什么情况？</a></li>
+            <li><a href="#先-put再-get-会出现什么情况">先 Put，再 Get 会出现什么情况？</a></li>
+            <li><a href="#只-get-不-put-会内存泄露吗">只 Get 不 Put 会内存泄露吗？</a></li>
+          </ul>
+        </li>
+        <li><a href="#使用场景">使用场景</a></li>
+        <li><a href="#使用注意点">使用注意点</a></li>
+        <li><a href="#参考链接">参考链接</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

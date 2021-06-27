@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Go timer 是如何被调度的？ #  hi，大家好，我是 haohongfan。
+本篇文章剖析下 Go 定时器的相关内容。定时器不管是业务开发，还是基础架构开发，都是绕不过去的存在，由此可见定时器的重要程度。
+我们不管用 NewTimer, timer.After，还是 timer.AfterFun 来初始化一个 timer, 这个 timer 最终都会加入到一个全局 timer 堆中，由 Go runtime 统一管理。
+全局的 timer 堆也经历过三个阶段的重要升级。
+ Go 1.9 版本之前，所有的计时器由全局唯一的四叉堆维护，协程间竞争激烈。 Go 1.10 - 1.13，全局使用 64 个四叉堆维护全部的计时器，没有本质解决 1.9 版本之前的问题 Go 1.14 版本之后，每个 P 单独维护一个四叉堆。  Go 1.14 以后的 timer 性能得到了质的飞升，不过伴随而来的是 timer 成了 Go 里面最复杂、最难梳理的数据结构。本文不会详细分析每一个细节，我们从大体来了解 Go timer 的工作原理。
+1. 使用场景 #  Go timer 在我们代码中会经常遇到。
+场景1：RPC 调用的防超时处理（下面代码节选 dubbogo)
+func (c *Client) Request(request *remoting.">
+<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="Timer" />
+<meta property="og:description" content="Go timer 是如何被调度的？ #  hi，大家好，我是 haohongfan。
+本篇文章剖析下 Go 定时器的相关内容。定时器不管是业务开发，还是基础架构开发，都是绕不过去的存在，由此可见定时器的重要程度。
+我们不管用 NewTimer, timer.After，还是 timer.AfterFun 来初始化一个 timer, 这个 timer 最终都会加入到一个全局 timer 堆中，由 Go runtime 统一管理。
+全局的 timer 堆也经历过三个阶段的重要升级。
+ Go 1.9 版本之前，所有的计时器由全局唯一的四叉堆维护，协程间竞争激烈。 Go 1.10 - 1.13，全局使用 64 个四叉堆维护全部的计时器，没有本质解决 1.9 版本之前的问题 Go 1.14 版本之后，每个 P 单独维护一个四叉堆。  Go 1.14 以后的 timer 性能得到了质的飞升，不过伴随而来的是 timer 成了 Go 里面最复杂、最难梳理的数据结构。本文不会详细分析每一个细节，我们从大体来了解 Go timer 的工作原理。
+1. 使用场景 #  Go timer 在我们代码中会经常遇到。
+场景1：RPC 调用的防超时处理（下面代码节选 dubbogo)
+func (c *Client) Request(request *remoting." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://georgehao.github.io/gohandbook.github.io/docs/timer-chapter/2021-04-01-timer/" /><meta property="article:section" content="docs" />
+
+<meta property="article:modified_time" content="2021-06-25T17:20:28&#43;08:00" />
+
+<title>Timer | Go 源码分析与实战</title>
+<link rel="manifest" href="/gohandbook.github.io/manifest.json">
+<link rel="icon" href="/gohandbook.github.io/favicon.png" type="image/x-icon">
+<link rel="stylesheet" href="/gohandbook.github.io/book.min.cf5d90d8574af1f10c485912bafecea50887593048830a5d1be5ac171dba0b42.css" integrity="sha256-z12Q2FdK8fEMSFkSuv7OpQiHWTBIgwpdG&#43;WsFx26C0I=" crossorigin="anonymous">
+  <script defer src="/gohandbook.github.io/flexsearch.min.js"></script>
+  <script defer src="/gohandbook.github.io/en.search.min.9879573fd40404498807413e7d87bb8fcbf6e2072a630a8d4789df9cdd48d060.js" integrity="sha256-mHlXP9QEBEmIB0E&#43;fYe7j8v24gcqYwqNR4nfnN1I0GA=" crossorigin="anonymous"></script>
+
+  <script defer src="/gohandbook.github.io/sw.min.81844b0756fc2ca3d283412f4c3cf8974f28a676397d293a5a34a3cbf3801244.js" integrity="sha256-gYRLB1b8LKPSg0EvTDz4l08opnY5fSk6WjSjy/OAEkQ=" crossorigin="anonymous"></script>
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a href="/gohandbook.github.io/"><span>Go 源码分析与实战</span>
+  </a>
+</h2>
+
+
+<div class="book-search">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+
+
+
+
+
+
+  
+<ul>
+  
+  <li>
+    <a href="https://www.haohongfan.com" target="_blank" rel="noopener">
+        HHFCodeRv 博客
+      </a>
+  </li>
+  
+</ul>
+
+
+
+
+
+
+
+  <hr />
+<br />
+<ul>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/rand-chapter/">随时数</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/rand-chapter/2021-01-23-rand/">Math/rand</a>
+<br /></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/sync-chapter/">并发原语</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-04-01-mutex/">sync.Mutex</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-cond/">sync.Cond</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-map/">sync.Map</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-waitgroup/">sync.WaitGroup</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-22-sync-pool/">sync.Pool</a>
+<br /></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/timer-chapter/">定时器</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/timer-chapter/2021-04-01-timer/"class=active>Timer</a></li>
+</ul>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var a=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(b){localStorage.setItem("menu.scrollTop",a.scrollTop)}),a.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/gohandbook.github.io/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Timer</strong>
+
+  <label for="toc-control">
+    
+    <img src="/gohandbook.github.io/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#go-timer-是如何被调度的">Go timer 是如何被调度的？</a>
+      <ul>
+        <li><a href="#1-使用场景">1. 使用场景</a></li>
+        <li><a href="#2-图解源码">2. 图解源码</a>
+          <ul>
+            <li><a href="#21-四叉堆原理">2.1 四叉堆原理</a></li>
+            <li><a href="#22-timer-是如何被调度的">2.2 timer 是如何被调度的？</a></li>
+            <li><a href="#23-timer-是如何加入到-timer-堆上的">2.3 timer 是如何加入到 timer 堆上的？</a></li>
+            <li><a href="#24-reset-时-timer-是如何被操作的">2.4 Reset 时 timer 是如何被操作的？</a></li>
+            <li><a href="#25-stop-时-timer-是如何被操作的">2.5 Stop 时 timer 是如何被操作的？</a></li>
+            <li><a href="#26-timer-是如何被真正执行的">2.6 Timer 是如何被真正执行的？</a></li>
+          </ul>
+        </li>
+        <li><a href="#3-timer-使用中的坑">3. Timer 使用中的坑</a>
+          <ul>
+            <li><a href="#31-错误创建很多-timer导致资源浪费">3.1 错误创建很多 timer，导致资源浪费</a></li>
+            <li><a href="#32-程序阻塞造成内存或者-goroutine-泄露">3.2 程序阻塞，造成内存或者 goroutine 泄露</a></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown"><h1 id="go-timer-是如何被调度的">
+  Go timer 是如何被调度的？
+  <a class="anchor" href="#go-timer-%e6%98%af%e5%a6%82%e4%bd%95%e8%a2%ab%e8%b0%83%e5%ba%a6%e7%9a%84">#</a>
+</h1>
+<p>hi，大家好，我是 haohongfan。</p>
+<p>本篇文章剖析下 Go 定时器的相关内容。定时器不管是业务开发，还是基础架构开发，都是绕不过去的存在，由此可见定时器的重要程度。</p>
+<p>我们不管用 NewTimer, timer.After，还是 timer.AfterFun 来初始化一个 timer, 这个 timer 最终都会加入到一个全局 timer 堆中，由 Go runtime 统一管理。</p>
+<p>全局的 timer 堆也经历过三个阶段的重要升级。</p>
+<ul>
+<li>Go 1.9 版本之前，所有的计时器由全局唯一的四叉堆维护，协程间竞争激烈。</li>
+<li>Go 1.10 - 1.13，全局使用 64 个四叉堆维护全部的计时器，没有本质解决 1.9 版本之前的问题</li>
+<li>Go 1.14 版本之后，每个 P 单独维护一个四叉堆。</li>
+</ul>
+<p>Go 1.14 以后的 timer 性能得到了质的飞升，不过伴随而来的是 timer 成了 Go 里面最复杂、最难梳理的数据结构。本文不会详细分析每一个细节，我们从大体来了解 Go timer 的工作原理。</p>
+<h2 id="1-使用场景">
+  1. 使用场景
+  <a class="anchor" href="#1-%e4%bd%bf%e7%94%a8%e5%9c%ba%e6%99%af">#</a>
+</h2>
+<p>Go timer 在我们代码中会经常遇到。</p>
+<p>场景1：RPC 调用的防超时处理（下面代码节选 dubbogo)</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">Client</span>) <span style="color:#a6e22e">Request</span>(<span style="color:#a6e22e">request</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">remoting</span>.<span style="color:#a6e22e">Request</span>, <span style="color:#a6e22e">timeout</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Duration</span>, <span style="color:#a6e22e">response</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">remoting</span>.<span style="color:#a6e22e">PendingResponse</span>) <span style="color:#66d9ef">error</span> {
+    <span style="color:#a6e22e">_</span>, <span style="color:#a6e22e">session</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">selectSession</span>(<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">addr</span>)
+    <span style="color:#75715e">// .. 省略
+</span><span style="color:#75715e"></span>    <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">totalLen</span>, <span style="color:#a6e22e">sendLen</span>, <span style="color:#a6e22e">err</span> = <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">transfer</span>(<span style="color:#a6e22e">session</span>, <span style="color:#a6e22e">request</span>, <span style="color:#a6e22e">timeout</span>); <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+        <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">sendLen</span> <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">totalLen</span> <span style="color:#f92672">!=</span> <span style="color:#a6e22e">sendLen</span> {
+          <span style="color:#75715e">// .. 省略
+</span><span style="color:#75715e"></span>        }
+        <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">perrors</span>.<span style="color:#a6e22e">WithStack</span>(<span style="color:#a6e22e">err</span>)
+    }
+
+    <span style="color:#75715e">// .. 省略
+</span><span style="color:#75715e"></span>    <span style="color:#66d9ef">select</span> {
+    <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">getty</span>.<span style="color:#a6e22e">GetTimeWheel</span>().<span style="color:#a6e22e">After</span>(<span style="color:#a6e22e">timeout</span>):
+        <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">perrors</span>.<span style="color:#a6e22e">WithStack</span>(<span style="color:#a6e22e">errClientReadTimeout</span>)
+    <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">response</span>.<span style="color:#a6e22e">Done</span>:
+        <span style="color:#a6e22e">err</span> = <span style="color:#a6e22e">response</span>.<span style="color:#a6e22e">Err</span>
+    }
+    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">perrors</span>.<span style="color:#a6e22e">WithStack</span>(<span style="color:#a6e22e">err</span>)
+}
+</code></pre></div><p>场景2：Context 的超时处理</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">cancel</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithTimeout</span>(<span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Background</span>(), <span style="color:#ae81ff">1</span><span style="color:#f92672">*</span><span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span>)
+    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">cancel</span>()
+    <span style="color:#66d9ef">go</span> <span style="color:#a6e22e">doSomething</span>()
+    
+    <span style="color:#66d9ef">select</span> {
+    <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Done</span>():
+        <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;main&#34;</span>, <span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Err</span>())
+    }
+}
+</code></pre></div><h2 id="2-图解源码">
+  2. 图解源码
+  <a class="anchor" href="#2-%e5%9b%be%e8%a7%a3%e6%ba%90%e7%a0%81">#</a>
+</h2>
+<h3 id="21-四叉堆原理">
+  2.1 四叉堆原理
+  <a class="anchor" href="#21-%e5%9b%9b%e5%8f%89%e5%a0%86%e5%8e%9f%e7%90%86">#</a>
+</h3>
+<p>timer 的全局堆是一个四叉堆，特别是 Go 1.14 之后每个 P 都会维护着一个四叉堆，减少了 Goroutine 之间的并发问题，提升了 timer 了性能。</p>
+<p>四叉堆其实就是四叉树，Go timer 是如何维护四叉堆的呢？</p>
+<ul>
+<li>Go runtime 调度 timer 时，触发时间更早的 timer，要减少其查询次数，尽快被触发。所以四叉树的父节点的触发时间是一定小于子节点的。</li>
+<li>四叉树顾名思义最多有四个子节点，为了兼顾四叉树插、删除、重排速度，所以四个兄弟节点间并不要求其按触发早晚排序。</li>
+</ul>
+<p>这里用两张动图简单演示下 timer 的插入和删除</p>
+<p><strong>把 timer 插入堆</strong>
+
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/add_timer.gif" alt="add_timer" /></p>
+<p><strong>把 timer 从堆中删除</strong>
+
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/delete_timer.gif" alt="delete_timer" /></p>
+<h3 id="22-timer-是如何被调度的">
+  2.2 timer 是如何被调度的？
+  <a class="anchor" href="#22-timer-%e6%98%af%e5%a6%82%e4%bd%95%e8%a2%ab%e8%b0%83%e5%ba%a6%e7%9a%84">#</a>
+</h3>
+<ul>
+<li>调用 NewTimer，timer.After, timer.AfterFunc 生产 timer, 加入对应的 P 的堆上。</li>
+<li>调用 timer.Stop, timer.Reset 改变对应的 timer 的状态。</li>
+<li>GMP 在调度周期内中会调用 checkTimers ，遍历该 P 的 timer 堆上的元素，根据对应 timer 的状态执行真的操作。</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/timer4.png" alt="" /></p>
+<h3 id="23-timer-是如何加入到-timer-堆上的">
+  2.3 timer 是如何加入到 timer 堆上的？
+  <a class="anchor" href="#23-timer-%e6%98%af%e5%a6%82%e4%bd%95%e5%8a%a0%e5%85%a5%e5%88%b0-timer-%e5%a0%86%e4%b8%8a%e7%9a%84">#</a>
+</h3>
+<p>把 timer 加入调度总共有下面几种方式：</p>
+<ul>
+<li>通过 NewTimer, time.After, timer.AfterFunc 初始化 timer 后，相关 timer 就会被放入到对应 p 的 timer 堆上。</li>
+<li>timer 已经被标记为 timerRemoved，调用了 timer.Reset(d)，这个 timer 也会重新被加入到 p 的 timer 堆上</li>
+<li>timer 还没到需要被执行的时间，被调用了 timer.Reset(d)，这个 timer 会被 GMP 调度探测到，先将该 timer 从 timer 堆上删除，然后重新加入到 timer 堆上</li>
+<li>STW 时，runtime 会释放不再使用的 p 的资源，p.destroy()-&gt;timer.moveTimers，将不再被使用的 p 的 timers 上有效的 timer(状态是：timerWaiting，timerModifiedEarlier，timerModifiedLater) 都重新加入到一个新的 p 的 timer 上</li>
+</ul>
+<h3 id="24-reset-时-timer-是如何被操作的">
+  2.4 Reset 时 timer 是如何被操作的？
+  <a class="anchor" href="#24-reset-%e6%97%b6-timer-%e6%98%af%e5%a6%82%e4%bd%95%e8%a2%ab%e6%93%8d%e4%bd%9c%e7%9a%84">#</a>
+</h3>
+<p>Reset 的目的是把 timer 重新加入到 timer 堆中，重新等待被触发。不过分为两种情况：</p>
+<ul>
+<li>被标记为 timerRemoved 的 timer，这种 timer 是已经从 timer 堆上删除了，但会重新设置被触发时间，加入到 timer 堆中</li>
+<li>等待被触发的 timer，在 Reset 函数中只会修改其触发时间和状态（timerModifiedEarlier或timerModifiedLater）。这个被修改状态的 timer 也同样会被重新加入到 timer堆上，不过是由 GMP 触发的，由 checkTimers 调用 adjusttimers 或者 runtimer 来执行的。</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/timer_reset110.png" alt="" /></p>
+<h3 id="25-stop-时-timer-是如何被操作的">
+  2.5 Stop 时 timer 是如何被操作的？
+  <a class="anchor" href="#25-stop-%e6%97%b6-timer-%e6%98%af%e5%a6%82%e4%bd%95%e8%a2%ab%e6%93%8d%e4%bd%9c%e7%9a%84">#</a>
+</h3>
+<p>time.Stop 为了让 timer 停止，不再被触发，也就是从 timer 堆上删除。不过 timer.Stop 并不会真正的从 p 的 timer 堆上删除 timer，只会将 timer 的状态修改为 timerDeleted。然后等待 GMP 触发的 adjusttimers 或者 runtimer 来执行。</p>
+<p>真正删除 timer 的函数有两个 dodeltimer，dodeltimer0。</p>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/timer_stop110.png" alt="" /></p>
+<h3 id="26-timer-是如何被真正执行的">
+  2.6 Timer 是如何被真正执行的？
+  <a class="anchor" href="#26-timer-%e6%98%af%e5%a6%82%e4%bd%95%e8%a2%ab%e7%9c%9f%e6%ad%a3%e6%89%a7%e8%a1%8c%e7%9a%84">#</a>
+</h3>
+<p>timer 的真正执行者是 GMP。GMP 会在每个调度周期内，通过 runtime.checkTimers 调用 timer.runtimer(). timer.runtimer 会检查该 p 的 timer 堆上的所有 timer，判断这些 timer 是否能被触发。</p>
+<p>如果该 timer 能够被触发，会通过回调函数 sendTime 给 Timer 的 channel C 发一个当前时间，告诉我们这个 timer 已经被触发了。</p>
+<p>如果是 ticker 的话，被触发后，会计算下一次要触发的时间，重新将 timer 加入 timer 堆中。</p>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/timer_runtimer110.png" alt="" /></p>
+<h2 id="3-timer-使用中的坑">
+  3. Timer 使用中的坑
+  <a class="anchor" href="#3-timer-%e4%bd%bf%e7%94%a8%e4%b8%ad%e7%9a%84%e5%9d%91">#</a>
+</h2>
+<p>确实 timer 是我们开发中比较常用的工具，但是 timer 也是最容易导致内存泄露，CPU 狂飙的杀手之一。</p>
+<p>不过仔细分析可以发现，其实能够造成问题就两个方面：</p>
+<ul>
+<li>错误创建很多的 timer，导致资源浪费</li>
+<li>由于 Stop 时不会主动关闭 C，导致程序阻塞</li>
+</ul>
+<h3 id="31-错误创建很多-timer导致资源浪费">
+  3.1 错误创建很多 timer，导致资源浪费
+  <a class="anchor" href="#31-%e9%94%99%e8%af%af%e5%88%9b%e5%bb%ba%e5%be%88%e5%a4%9a-timer%e5%af%bc%e8%87%b4%e8%b5%84%e6%ba%90%e6%b5%aa%e8%b4%b9">#</a>
+</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#66d9ef">for</span> {
+        <span style="color:#75715e">// xxx 一些操作
+</span><span style="color:#75715e"></span>        <span style="color:#a6e22e">timeout</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">After</span>(<span style="color:#ae81ff">30</span> <span style="color:#f92672">*</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span>)
+        <span style="color:#66d9ef">select</span> {
+        <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">someDone</span>:
+            <span style="color:#75715e">// do something
+</span><span style="color:#75715e"></span>        <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">timeout</span>:
+            <span style="color:#66d9ef">return</span>
+        }
+    }
+}
+</code></pre></div><p>上面这段代码是造成 timer 异常的最常见的写法，也是我们最容易忽略的写法。</p>
+<p>造成问题的原因其实也很简单，因为 timer.After 底层是调用的 timer.NewTimer，NewTimer 生成 timer 后，会将 timer 放入到全局的 timer 堆中。</p>
+<p>for 会创建出来数以万计的 timer 放入到 timer 堆中，导致机器内存暴涨，同时不管 GMP 周期 checkTimers，还是插入新的 timer 都会疯狂遍历 timer 堆，导致 CPU 异常。</p>
+<p>要注意的是，不只 time.After 会生成 timer, NewTimer，time.AfterFunc 同样也会生成 timer 加入到 timer 中，也都要防止循环调用。</p>
+<p><strong>解决办法:</strong> 使用 time.Reset 重置 timer，重复利用 timer。</p>
+<p>我们已经知道 time.Reset 会重新设置 timer 的触发时间，然后将 timer 重新加入到 timer 堆中，等待被触发调用。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#a6e22e">timer</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">NewTimer</span>(<span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">5</span>)    
+    <span style="color:#66d9ef">for</span> {
+        <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">Reset</span>(<span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">5</span>)
+
+        <span style="color:#66d9ef">select</span> {
+        <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">someDone</span>:
+            <span style="color:#75715e">// do something
+</span><span style="color:#75715e"></span>        <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">timer</span>.<span style="color:#a6e22e">C</span>:
+            <span style="color:#66d9ef">return</span>
+        }
+    }
+}
+</code></pre></div><h3 id="32-程序阻塞造成内存或者-goroutine-泄露">
+  3.2 程序阻塞，造成内存或者 goroutine 泄露
+  <a class="anchor" href="#32-%e7%a8%8b%e5%ba%8f%e9%98%bb%e5%a1%9e%e9%80%a0%e6%88%90%e5%86%85%e5%ad%98%e6%88%96%e8%80%85-goroutine-%e6%b3%84%e9%9c%b2">#</a>
+</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#a6e22e">timer1</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">NewTimer</span>(<span style="color:#ae81ff">2</span> <span style="color:#f92672">*</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span>)
+    <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">timer1</span>.<span style="color:#a6e22e">C</span>
+    println(<span style="color:#e6db74">&#34;done&#34;</span>)
+}
+</code></pre></div><p>上面的代码可以看出来，只有等待 timer 超时 &ldquo;done&rdquo; 才会输出，原理很简单：程序阻塞在 &lt;-timer1.C 上，一直等待 timer 被触发时，回调函数 time.sendTime 才会发送一个当前时间到 timer1.C 上，程序才能继续往下执行。</p>
+<p>不过使用 timer.Stop 的时候就要特别注意了，比如：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#a6e22e">timer1</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">NewTimer</span>(<span style="color:#ae81ff">2</span> <span style="color:#f92672">*</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span>)
+    <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+        <span style="color:#a6e22e">timer1</span>.<span style="color:#a6e22e">Stop</span>()
+    }()
+    <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">timer1</span>.<span style="color:#a6e22e">C</span>
+
+    println(<span style="color:#e6db74">&#34;done&#34;</span>)
+}
+</code></pre></div><p>程序就会一直死锁了，因为 timer1.Stop 并不会关闭 channel C，使程序一直阻塞在 timer1.C 上。</p>
+<p>上面这个例子过于简单了，试想下如果 &lt;- timer1.C 是阻塞在子协程中，timer 被的 Stop 方法被调用，那么子协程可能就会被永远的阻塞在那里，造成 goroutine 泄露，内存泄露。</p>
+<p>Stop 的正确的使用方式：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#a6e22e">timer1</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">NewTimer</span>(<span style="color:#ae81ff">2</span> <span style="color:#f92672">*</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span>)
+    <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+        <span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">timer1</span>.<span style="color:#a6e22e">Stop</span>() {
+            <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">timer1</span>.<span style="color:#a6e22e">C</span>
+        }
+    }()
+
+    <span style="color:#66d9ef">select</span> {
+    <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">timer1</span>.<span style="color:#a6e22e">C</span>:
+        <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;expired&#34;</span>)
+    <span style="color:#66d9ef">default</span>:
+    }
+    println(<span style="color:#e6db74">&#34;done&#34;</span>)
+}
+</code></pre></div><p>到此，Go timer 基本已经结束了，有想跟我讨论的可以在留言区评论。</p>
+<hr>
+<p>Go timer 完整流程图获取链接：链接: 链接: <a href="https://pan.baidu.com/s/1nUvTK_0qBlwbS6LbZXKM7g">https://pan.baidu.com/s/1nUvTK_0qBlwbS6LbZXKM7g</a> 密码: t219 其他模块流程图，请关注公众号 HHFCodeRv 回复1获取。</p>
+<p>更多学习学习资料分享，关注公众号回复指令：</p>
+<ul>
+<li>回复 0，获取 《Go 面经》</li>
+<li>回复 1，获取 《Go 源码流程图》</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/me.png" alt="" /></p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+  
+
+
+
+  
+    
+  
+    
+  
+
+
+
+<div class="book-languages" tabindex="0" aria-haspopup="true">
+  <ul>
+    <li class="flex align-center">
+      <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+      English
+    </li> 
+  </ul>
+
+  <ul class="book-languages-list">
+    
+    <li class="">
+      <a href="https://georgehao.github.io/gohandbook.github.io/zh/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        Chinese
+      </a>
+    </li>
+    
+    <li class="active">
+      <a href="https://georgehao.github.io/gohandbook.github.io/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        English
+      </a>
+    </li>
+    
+  </ul>
+</div>
+
+
+
+
+  <div><a class="flex align-center" href="https://github.com/alex-shpak/hugo-book/commit/73a0218380c66a9990643d82e57051460c2cf2d0" title='Last modified by georgehao | June 25, 2021' target="_blank" rel="noopener">
+      <img src="/gohandbook.github.io/svg/calendar.svg" class="book-icon" alt="Calendar" />
+      <span>June 25, 2021</span>
+    </a>
+  </div>
+
+
+
+</div>
+
+
+
+  <script>(function(){function a(c){const a=window.getSelection(),b=document.createRange();b.selectNodeContents(c),a.removeAllRanges(),a.addRange(b)}document.querySelectorAll("pre code").forEach(b=>{b.addEventListener("click",function(c){a(b.parentElement),navigator.clipboard&&navigator.clipboard.writeText(b.parentElement.textContent)})})})()</script>
+
+
+<footer id="footer">
+    <div class="container">
+		<div>
+		以上内容均不得复制用于商业用途或发行
+		</div>
+		<br/>
+        &copy; 2015-2021, By haohongfan Licensed under CC-BY-NC-ND 4.0</a>。
+        备案号：<a href="http://www.beian.miit.gov.cn" target="_blank">京ICP备17041575号</a>
+        
+    </div>
+</footer>
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+
+<br>
+<hr color="#D6D6D6" size=0>
+<script src="https://utteranc.es/client.js"
+        repo="georgehao/oblog"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#go-timer-是如何被调度的">Go timer 是如何被调度的？</a>
+      <ul>
+        <li><a href="#1-使用场景">1. 使用场景</a></li>
+        <li><a href="#2-图解源码">2. 图解源码</a>
+          <ul>
+            <li><a href="#21-四叉堆原理">2.1 四叉堆原理</a></li>
+            <li><a href="#22-timer-是如何被调度的">2.2 timer 是如何被调度的？</a></li>
+            <li><a href="#23-timer-是如何加入到-timer-堆上的">2.3 timer 是如何加入到 timer 堆上的？</a></li>
+            <li><a href="#24-reset-时-timer-是如何被操作的">2.4 Reset 时 timer 是如何被操作的？</a></li>
+            <li><a href="#25-stop-时-timer-是如何被操作的">2.5 Stop 时 timer 是如何被操作的？</a></li>
+            <li><a href="#26-timer-是如何被真正执行的">2.6 Timer 是如何被真正执行的？</a></li>
+          </ul>
+        </li>
+        <li><a href="#3-timer-使用中的坑">3. Timer 使用中的坑</a>
+          <ul>
+            <li><a href="#31-错误创建很多-timer导致资源浪费">3.1 错误创建很多 timer，导致资源浪费</a></li>
+            <li><a href="#32-程序阻塞造成内存或者-goroutine-泄露">3.2 程序阻塞，造成内存或者 goroutine 泄露</a></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

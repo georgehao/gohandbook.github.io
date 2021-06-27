@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>系列介绍 on Go 源码分析与实战</title>
+    <link>https://georgehao.github.io/gohandbook.github.io/</link>
+    <description>Recent content in 系列介绍 on Go 源码分析与实战</description>
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://georgehao.github.io/gohandbook.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Math/rand</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/rand-chapter/2021-01-23-rand/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/rand-chapter/2021-01-23-rand/</guid>
+      <description>一文完全掌握 Go math/rand #  Go 获取随机数是开发中经常会用到的功能, 不过这个里面还是有一些坑存在的, 本文将完全剖析 Go math/rand, 让你轻松使用 Go Rand.
+开篇一问: 你觉得 rand 会 panic 吗 ?
+ 源码剖析 #  math/rand 源码其实很简单, 就两个比较重要的函数
+func (rng *rngSource) Seed(seed int64) { rng.tap = 0 rng.feed = rngLen - rngTap //... 	x := int32(seed) for i := -20; i &amp;lt; rngLen; i++ { x = seedrand(x) if i &amp;gt;= 0 { var u int64 u = int64(x) &amp;lt;&amp;lt; 40 x = seedrand(x) u ^= int64(x) &amp;lt;&amp;lt; 20 x = seedrand(x) u ^= int64(x) u ^= rngCooked[i] rng.</description>
+    </item>
+    
+    <item>
+      <title>Mutex</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-04-01-mutex/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-04-01-mutex/</guid>
+      <description>这可能是最容易理解的 Go Mutex 源码剖析 #  Hi，大家好，我是 haohongfan。
+上一篇文章《一文完全掌握 Go math/rand》，我们知道 math/rand 的 global rand 有一个全局锁，我的文章里面有一句话：“修复方案: 就是把 rrRand 换成了 globalRand, 在线上高并发场景下, 发现全局锁影响并不大.”， 有同学私聊我“他们遇到线上服务的锁竞争特别激烈”。确实我这句话说的并不严谨。但是也让我有了一个思考：到底多高的 QPS 才能让 Mutex 产生强烈的锁竞争 ？
+到底加锁的代码会不会产生线上问题？ 到底该不该使用锁来实现这个功能？线上的问题是不是由于使用了锁造成的？针对这些问题，本文就从源码角度剖析 Go Mutex, 揭开 Mutex 的迷雾。
+源码分析 #  Go mutex 源码只有短短的 228 行，但是却包含了很多的状态转变在里面，很不容易看懂，具体可以参见下面的流程图。Mutex 的实现主要借助了 CAS 指令 + 自旋 + 信号量来实现，具体代码我就不再每一行做分析了，有兴趣的可以根据下面流程图配合源码阅读一番。
+Lock #   Unlock #   一些例子 #   一个 goroutine 加锁解锁过程   没有加锁，直接解锁问题    两个 Goroutine，互相加锁解锁   三个 Goroutine 等待加锁过程   整篇源码其实涉及比较难以理解的就是 Mutex 状态（mutexLocked，mutexWoken，mutexStarving，mutexWaiterShift） 与 Goroutine 之间的状态（starving，awoke）改变， 我们下面将逐一说明。</description>
+    </item>
+    
+    <item>
+      <title>Timer</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/timer-chapter/2021-04-01-timer/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/timer-chapter/2021-04-01-timer/</guid>
+      <description>Go timer 是如何被调度的？ #  hi，大家好，我是 haohongfan。
+本篇文章剖析下 Go 定时器的相关内容。定时器不管是业务开发，还是基础架构开发，都是绕不过去的存在，由此可见定时器的重要程度。
+我们不管用 NewTimer, timer.After，还是 timer.AfterFun 来初始化一个 timer, 这个 timer 最终都会加入到一个全局 timer 堆中，由 Go runtime 统一管理。
+全局的 timer 堆也经历过三个阶段的重要升级。
+ Go 1.9 版本之前，所有的计时器由全局唯一的四叉堆维护，协程间竞争激烈。 Go 1.10 - 1.13，全局使用 64 个四叉堆维护全部的计时器，没有本质解决 1.9 版本之前的问题 Go 1.14 版本之后，每个 P 单独维护一个四叉堆。  Go 1.14 以后的 timer 性能得到了质的飞升，不过伴随而来的是 timer 成了 Go 里面最复杂、最难梳理的数据结构。本文不会详细分析每一个细节，我们从大体来了解 Go timer 的工作原理。
+1. 使用场景 #  Go timer 在我们代码中会经常遇到。
+场景1：RPC 调用的防超时处理（下面代码节选 dubbogo)
+func (c *Client) Request(request *remoting.</description>
+    </item>
+    
+    <item>
+      <title>Cond</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-cond/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-cond/</guid>
+      <description>这一次，彻底搞懂 Go Cond #  hi，大家好，我是 haohongfan。
+本篇文章会从源码角度去深入剖析下 sync.Cond。Go 日常开发中 sync.Cond 可能是我们用的较少的控制并发的手段，因为大部分场景下都被 Channel 代替了。还有就是 sync.Cond 使用确实也蛮复杂的。
+比如下面这段代码：
+package main import ( &amp;#34;fmt&amp;#34; &amp;#34;time&amp;#34; ) func main() { done := make(chan int, 1) go func() { time.Sleep(5 * time.Second) done &amp;lt;- 1 }() fmt.Println(&amp;#34;waiting&amp;#34;) &amp;lt;-done fmt.Println(&amp;#34;done&amp;#34;) } 同样可以使用 sync.Cond 来实现
+package main import ( &amp;#34;fmt&amp;#34; &amp;#34;sync&amp;#34; &amp;#34;time&amp;#34; ) func main() { cond := sync.NewCond(&amp;amp;sync.Mutex{}) var flag bool go func() { time.Sleep(time.Second * 5) cond.</description>
+    </item>
+    
+    <item>
+      <title>Sync.Map</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-map/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-map/</guid>
+      <description>看过这篇剖析，你还不懂 Go sync.Map 吗 #  hi, 大家好，我是 haohongfan。
+本篇文章会从使用方式和原码角度剖析 sync.Map。不过不管是日常开发还是开源项目中，好像 sync.Map 并没有得到很好的利用，大家还是习惯使用 Mutex + Map 来使用。
+下面这段代码，看起来很有道理，其实是用错了（背景：并发场景中获取注册信息）。
+instance, ok := instanceMap[name] if ok { return instance, nil } initLock.Lock() defer initLock.Unlock() // double check instance, ok = instanceMap[name] if ok { return instance, nil } 这里使用使用 sync.Map 会更合理些，因为 sync.Map 底层完全包含了这个逻辑。可能写 Java 的同学看着上面这段代码很眼熟，但确实是用错了，关于为什么用错了以及会造成什么影响，请大家关注后续的文章。
+我大概分析了下大家宁愿使用 Mutex + Map，也不愿使用 sync.Map 的原因：
+ sync.Map 本身就很难用，使用起来并不像一个 Map。失去了 map 应有的特权语法，如：make, map[1] 等 sync.Map 方法较多。让一个简单的 Map 使用起来有了较高的学习成本。  不管什么样的原因吧，当你读过这篇文章后，在某些特定的并发场景下，建议使用 sync.</description>
+    </item>
+    
+    <item>
+      <title>WaitGroup</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-waitgroup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-waitgroup/</guid>
+      <description>最清晰易懂的 Go WaitGroup 源码剖析 #  hi，大家好，我是haohongfan。
+本篇主要介绍 WaitGroup 的一些特性，让我们从本质上去了解 WaitGroup。关于 WaitGroup 的基本用法这里就不做过多介绍了。相对于《这可能是最容易理解的 Go Mutex 源码剖析》来说，WaitGroup 就简单的太多了。
+源码剖析 #    type WaitGroup struct { noCopy noCopy state1 [3]uint32 } WaitGroup 底层结构看起来简单，但 WaitGroup.state1 其实代表三个字段：counter，waiter，sema。
+counter ：可以理解为一个计数器，计算经过 wg.Add(N), wg.Done() 后的值。 waiter ：当前等待 WaitGroup 任务结束的等待者数量。其实就是调用 wg.Wait() 的次数，所以通常这个值是 1 。 sema ： 信号量，用来唤醒 Wait() 函数。
+为什么要将 counter 和 waiter 放在一起 ？ #  其实是为了保证 WaitGroup 状态的完整性。举个例子，看下面的一段源码
+// sync/waitgroup.go:L79 --&amp;gt; Add() if v &amp;gt; 0 || w == 0 { // v =&amp;gt; counter, w =&amp;gt; waiter  return } // .</description>
+    </item>
+    
+    <item>
+      <title>sync.Pool</title>
+      <link>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-22-sync-pool/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://georgehao.github.io/gohandbook.github.io/docs/sync-chapter/2021-05-22-sync-pool/</guid>
+      <description>Go sync.Pool 浅析 #  hi, 大家好，我是 haohongfan。
+sync.Pool 应该是 Go 里面明星级别的数据结构，有很多优秀的文章都在介绍这个结构，本篇文章简单剖析下 sync.Pool。不过说实话 sync.Pool 并不是我们日常开发中使用频率很高的的并发原语。
+尽管用的频率很低，但是不可否认的是 sync.Pool 确实是 Go 的杀手锏，合理使用 sync.Pool 会让我们的程序性能飙升。本篇文章会从使用方式，源码剖析，运用场景等方面，让你对 sync.Pool 有一个清晰的认知。
+使用方式 #  sync.Pool 使用很简单，但是想用对却很麻烦，因为你有可能看到网上一堆错误的示例，各位同学在搜索 sync.Pool 的使用例子时，要特别注意。
+sync.Pool 是一个内存池。通常内存池是用来防止内存泄露的（例如C/C++)。sync.Pool 这个内存池却不是干这个的，带 GC 功能的语言都存在垃圾回收 STW 问题，需要回收的内存块越多，STW 持续时间就越长。如果能让 new 出来的变量，一直不被回收，得到重复利用，是不是就减轻了 GC 的压力。
+正确的使用示例（下面的demo选自gin）
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) { c := engine.pool.Get().(*Context) c.writermem.reset(w) c.Request = req c.reset() engine.handleHTTPRequest(c) engine.pool.Put(c) } 一定要注意的是：是先 Get 获取内存空间，基于这个内存做相关的处理，然后再将这个内存还回（Put）到 sync.Pool。
+Pool 结构 #   源码图解 #    简单点可以总结成下面的流程：</description>
+    </item>
+    
+  </channel>
+</rss>

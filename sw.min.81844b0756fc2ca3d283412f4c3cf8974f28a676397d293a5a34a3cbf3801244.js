@@ -1,0 +1,1 @@
+navigator.serviceWorker&&navigator.serviceWorker.register("/gohandbook.github.io/sw.js",{scope:"/gohandbook.github.io/"})

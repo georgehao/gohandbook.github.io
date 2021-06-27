@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+	<meta name="generator" content="Hugo 0.82.0" />
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="这个系列文章的目标 #  Go 业务开发中你是否遇到过这些问题？
+ 程序出现问题时，定位到某个关键字，才恍然大悟：哦，原来是这么用的！ 看别人代码，看到某段代码时，顿时愣住：这么写是为啥？ 同事间讨论问题，说到某个知识点，自己沉默了下去：不能让别人看出来，我还不会这个知识点 看到别人侃侃而谈源码，自己却不知道如何入手！  这个系列的目标：
+用 源码&#43;图 去解析 Go，从原理上去剖析 Go，从原理上去实战 Go。
+Go 源码分析，项目实战系列教程，这个系列教程还在更新中，可以关注公众号：HHFCodeRv 第一时间阅读最新章节（公众号二维码在文末）。
+ 当前内容基于 Go 源码 1.16.2
+ 目标读者 #   熟悉 Go，已经熟悉其基础的语法。 有一定的开发经验  源码学习方式 #  Go 的源码挺不容易理解的，短短几百行代码如同天书一样，后来没办法就把对应的流程图画了下来，还别说这个方式学习 Go 源码还挺有效的。
+当然这个过程也积累了相关的流程图文档，可以分享给读者。
+链接: https://pan.baidu.com/s/1RIX6NKj8UhWkdFyFHptWwg 密码: rsg9
+互动与勘误 #  如果你对文章的内容有疑问，可以再对应章节留言。也可以关注我的公众号：HHFCodeRv，相关章节也会第一时间在公众号发布。
+更多学习学习资料分享，关注公众号回复指令：
+ 回复 0，获取 《Go 面经》 回复 1，获取 《Go 源码流程图》   ">
+<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="系列介绍" />
+<meta property="og:description" content="" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://georgehao.github.io/gohandbook.github.io/" />
+
+<title>系列介绍 | Go 源码分析与实战</title>
+<link rel="manifest" href="/gohandbook.github.io/manifest.json">
+<link rel="icon" href="/gohandbook.github.io/favicon.png" type="image/x-icon">
+  <link rel="alternate" hreflang="zh" href="https://georgehao.github.io/gohandbook.github.io/zh/" title="Go 源码分析与实战">
+<link rel="stylesheet" href="/gohandbook.github.io/book.min.cf5d90d8574af1f10c485912bafecea50887593048830a5d1be5ac171dba0b42.css" integrity="sha256-z12Q2FdK8fEMSFkSuv7OpQiHWTBIgwpdG&#43;WsFx26C0I=" crossorigin="anonymous">
+  <script defer src="/gohandbook.github.io/flexsearch.min.js"></script>
+  <script defer src="/gohandbook.github.io/en.search.min.9879573fd40404498807413e7d87bb8fcbf6e2072a630a8d4789df9cdd48d060.js" integrity="sha256-mHlXP9QEBEmIB0E&#43;fYe7j8v24gcqYwqNR4nfnN1I0GA=" crossorigin="anonymous"></script>
+
+  <script defer src="/gohandbook.github.io/sw.min.81844b0756fc2ca3d283412f4c3cf8974f28a676397d293a5a34a3cbf3801244.js" integrity="sha256-gYRLB1b8LKPSg0EvTDz4l08opnY5fSk6WjSjy/OAEkQ=" crossorigin="anonymous"></script>
+<link rel="alternate" type="application/rss+xml" href="https://georgehao.github.io/gohandbook.github.io/index.xml" title="Go 源码分析与实战" />
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a href="/gohandbook.github.io/"><span>Go 源码分析与实战</span>
+  </a>
+</h2>
+
+
+<div class="book-search">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+
+
+
+
+
+
+  
+<ul>
+  
+  <li>
+    <a href="https://www.haohongfan.com" target="_blank" rel="noopener">
+        HHFCodeRv 博客
+      </a>
+  </li>
+  
+</ul>
+
+
+
+
+
+
+
+  <hr />
+<br />
+<ul>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/rand-chapter/">随时数</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/rand-chapter/2021-01-23-rand/">Math/rand</a>
+<br /></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/sync-chapter/">并发原语</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-04-01-mutex/">sync.Mutex</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-cond/">sync.Cond</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-map/">sync.Map</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-10-sync-waitgroup/">sync.WaitGroup</a></li>
+<li>
+  <a href="/gohandbook.github.io/docs/sync-chapter/2021-05-22-sync-pool/">sync.Pool</a>
+<br /></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/gohandbook.github.io/docs/timer-chapter/">定时器</a></p>
+<ul>
+<li>
+  <a href="/gohandbook.github.io/docs/timer-chapter/2021-04-01-timer/">Timer</a></li>
+</ul>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var a=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(b){localStorage.setItem("menu.scrollTop",a.scrollTop)}),a.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/gohandbook.github.io/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>系列介绍</strong>
+
+  <label for="toc-control">
+    
+    <img src="/gohandbook.github.io/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#这个系列文章的目标">这个系列文章的目标</a></li>
+        <li><a href="#目标读者">目标读者</a></li>
+        <li><a href="#源码学习方式">源码学习方式</a></li>
+        <li><a href="#互动与勘误">互动与勘误</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown"><h2 id="这个系列文章的目标">
+  这个系列文章的目标
+  <a class="anchor" href="#%e8%bf%99%e4%b8%aa%e7%b3%bb%e5%88%97%e6%96%87%e7%ab%a0%e7%9a%84%e7%9b%ae%e6%a0%87">#</a>
+</h2>
+<p>Go 业务开发中你是否遇到过这些问题？</p>
+<ol>
+<li>程序出现问题时，定位到某个关键字，才恍然大悟：哦，原来是这么用的！</li>
+<li>看别人代码，看到某段代码时，顿时愣住：这么写是为啥？</li>
+<li>同事间讨论问题，说到某个知识点，自己沉默了下去：不能让别人看出来，我还不会这个知识点</li>
+<li>看到别人侃侃而谈源码，自己却不知道如何入手！</li>
+</ol>
+<p>这个系列的目标：</p>
+<p><strong>用 源码+图 去解析 Go，从原理上去剖析 Go，从原理上去实战 Go。</strong></p>
+<p>Go 源码分析，项目实战系列教程，这个系列教程还在更新中，可以关注公众号：HHFCodeRv 第一时间阅读最新章节（公众号二维码在文末）。</p>
+<blockquote>
+<p>当前内容基于 Go 源码 1.16.2</p>
+</blockquote>
+<h2 id="目标读者">
+  目标读者
+  <a class="anchor" href="#%e7%9b%ae%e6%a0%87%e8%af%bb%e8%80%85">#</a>
+</h2>
+<ol>
+<li>熟悉 Go，已经熟悉其基础的语法。</li>
+<li>有一定的开发经验</li>
+</ol>
+<h2 id="源码学习方式">
+  源码学习方式
+  <a class="anchor" href="#%e6%ba%90%e7%a0%81%e5%ad%a6%e4%b9%a0%e6%96%b9%e5%bc%8f">#</a>
+</h2>
+<p>Go 的源码挺不容易理解的，短短几百行代码如同天书一样，后来没办法就把对应的流程图画了下来，还别说这个方式学习 Go 源码还挺有效的。</p>
+<p>当然这个过程也积累了相关的流程图文档，可以分享给读者。</p>
+<p>链接: <a href="https://pan.baidu.com/s/1RIX6NKj8UhWkdFyFHptWwg">https://pan.baidu.com/s/1RIX6NKj8UhWkdFyFHptWwg</a>  密码: rsg9</p>
+<h2 id="互动与勘误">
+  互动与勘误
+  <a class="anchor" href="#%e4%ba%92%e5%8a%a8%e4%b8%8e%e5%8b%98%e8%af%af">#</a>
+</h2>
+<p>如果你对文章的内容有疑问，可以再对应章节留言。也可以关注我的公众号：HHFCodeRv，相关章节也会第一时间在公众号发布。</p>
+<p>更多学习学习资料分享，关注公众号回复指令：</p>
+<ul>
+<li>回复 0，获取 《Go 面经》</li>
+<li>回复 1，获取 《Go 源码流程图》</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/me.png" alt="" /></p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+  
+
+
+
+  
+    
+  
+    
+  
+
+
+  
+
+
+<div class="book-languages" tabindex="0" aria-haspopup="true">
+  <ul>
+    <li class="flex align-center">
+      <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+      English
+    </li> 
+  </ul>
+
+  <ul class="book-languages-list">
+    
+    <li class="">
+      <a href="https://georgehao.github.io/gohandbook.github.io/zh/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        Chinese
+      </a>
+    </li>
+    
+    <li class="active">
+      <a href="https://georgehao.github.io/gohandbook.github.io/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        English
+      </a>
+    </li>
+    
+  </ul>
+</div>
+
+
+
+
+  <div><a class="flex align-center" href="https://github.com/alex-shpak/hugo-book/commit/6c27b6cb726e08aa78e8b086eaac792cb6282cec" title='Last modified by georgehao | June 25, 2021' target="_blank" rel="noopener">
+      <img src="/gohandbook.github.io/svg/calendar.svg" class="book-icon" alt="Calendar" />
+      <span>June 25, 2021</span>
+    </a>
+  </div>
+
+
+
+</div>
+
+
+
+  <script>(function(){function a(c){const a=window.getSelection(),b=document.createRange();b.selectNodeContents(c),a.removeAllRanges(),a.addRange(b)}document.querySelectorAll("pre code").forEach(b=>{b.addEventListener("click",function(c){a(b.parentElement),navigator.clipboard&&navigator.clipboard.writeText(b.parentElement.textContent)})})})()</script>
+
+
+<footer id="footer">
+    <div class="container">
+		<div>
+		以上内容均不得复制用于商业用途或发行
+		</div>
+		<br/>
+        &copy; 2015-2021, By haohongfan Licensed under CC-BY-NC-ND 4.0</a>。
+        备案号：<a href="http://www.beian.miit.gov.cn" target="_blank">京ICP备17041575号</a>
+        
+    </div>
+</footer>
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+
+<br>
+<hr color="#D6D6D6" size=0>
+<script src="https://utteranc.es/client.js"
+        repo="georgehao/oblog"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#这个系列文章的目标">这个系列文章的目标</a></li>
+        <li><a href="#目标读者">目标读者</a></li>
+        <li><a href="#源码学习方式">源码学习方式</a></li>
+        <li><a href="#互动与勘误">互动与勘误</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

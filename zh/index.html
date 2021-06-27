@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh" dir="ltr">
+<head>
+	<meta name="generator" content="Hugo 0.82.0" />
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="Go 源码分析与实战" />
+<meta property="og:description" content="" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://georgehao.github.io/gohandbook.github.io/zh/" />
+
+<title>Go 源码分析与实战 | Go 源码分析与实战</title>
+<link rel="manifest" href="/gohandbook.github.io/manifest.json">
+<link rel="icon" href="/gohandbook.github.io/favicon.png" type="image/x-icon">
+  <link rel="alternate" hreflang="en" href="https://georgehao.github.io/gohandbook.github.io/" title="系列介绍">
+<link rel="stylesheet" href="/gohandbook.github.io/book.min.cf5d90d8574af1f10c485912bafecea50887593048830a5d1be5ac171dba0b42.css" integrity="sha256-z12Q2FdK8fEMSFkSuv7OpQiHWTBIgwpdG&#43;WsFx26C0I=" crossorigin="anonymous">
+  <script defer src="/gohandbook.github.io/flexsearch.min.js"></script>
+  <script defer src="/gohandbook.github.io/zh.search.min.ab9e093dce7324460cc19c6789b76e11fa20457225cd60d02bf1b46cb0b4986f.js" integrity="sha256-q54JPc5zJEYMwZxnibduEfogRXIlzWDQK/G0bLC0mG8=" crossorigin="anonymous"></script>
+
+  <script defer src="/gohandbook.github.io/sw.min.81844b0756fc2ca3d283412f4c3cf8974f28a676397d293a5a34a3cbf3801244.js" integrity="sha256-gYRLB1b8LKPSg0EvTDz4l08opnY5fSk6WjSjy/OAEkQ=" crossorigin="anonymous"></script>
+<link rel="alternate" type="application/rss+xml" href="https://georgehao.github.io/gohandbook.github.io/zh/index.xml" title="Go 源码分析与实战" />
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a href="/gohandbook.github.io/zh/"><span>Go 源码分析与实战</span>
+  </a>
+</h2>
+
+
+<div class="book-search">
+  <input type="text" id="book-search-input" placeholder="搜索" aria-label="搜索" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+
+
+
+
+
+
+  
+<ul>
+  
+  <li>
+    <a href="https://www.haohongfan.com" target="_blank" rel="noopener">
+        HHFCodeRv 博客
+      </a>
+  </li>
+  
+</ul>
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var a=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(b){localStorage.setItem("menu.scrollTop",a.scrollTop)}),a.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/gohandbook.github.io/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>Go 源码分析与实战</strong>
+
+  <label for="toc-control">
+    
+    <img src="/gohandbook.github.io/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown"></article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+  
+
+
+
+  
+    
+  
+    
+  
+
+
+  
+
+
+<div class="book-languages" tabindex="0" aria-haspopup="true">
+  <ul>
+    <li class="flex align-center">
+      <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+      Chinese
+    </li> 
+  </ul>
+
+  <ul class="book-languages-list">
+    
+    <li class="active">
+      <a href="https://georgehao.github.io/gohandbook.github.io/zh/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        Chinese
+      </a>
+    </li>
+    
+    <li class="">
+      <a href="https://georgehao.github.io/gohandbook.github.io/" class="flex align-center">
+        <img src="/gohandbook.github.io/svg/translate.svg" class="book-icon" alt="Languages" />
+        English
+      </a>
+    </li>
+    
+  </ul>
+</div>
+
+
+
+
+
+
+</div>
+
+
+
+  <script>(function(){function a(c){const a=window.getSelection(),b=document.createRange();b.selectNodeContents(c),a.removeAllRanges(),a.addRange(b)}document.querySelectorAll("pre code").forEach(b=>{b.addEventListener("click",function(c){a(b.parentElement),navigator.clipboard&&navigator.clipboard.writeText(b.parentElement.textContent)})})})()</script>
+
+
+<footer id="footer">
+    <div class="container">
+		<div>
+		以上内容均不得复制用于商业用途或发行
+		</div>
+		<br/>
+        &copy; 2015-2021, By haohongfan Licensed under CC-BY-NC-ND 4.0</a>。
+        备案号：<a href="http://www.beian.miit.gov.cn" target="_blank">京ICP备17041575号</a>
+        
+    </div>
+</footer>
+
+ 
+        
+      </footer>
+
+      
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
