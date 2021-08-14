@@ -2,15 +2,15 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>并发原语 on Go 源码分析与实战</title>
-    <link>https://gohandbook.haohongfan.com/docs/sync-chapter/</link>
+    <link>https://www.haohongfan.com/docs/sync-chapter/</link>
     <description>Recent content in 并发原语 on Go 源码分析与实战</description>
-    <generator>Hugo -- gohugo.io</generator><atom:link href="https://gohandbook.haohongfan.com/docs/sync-chapter/index.xml" rel="self" type="application/rss+xml" />
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://www.haohongfan.com/docs/sync-chapter/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Mutex</title>
-      <link>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-04-01-mutex/</link>
+      <link>https://www.haohongfan.com/docs/sync-chapter/2021-04-01-mutex/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-04-01-mutex/</guid>
+      <guid>https://www.haohongfan.com/docs/sync-chapter/2021-04-01-mutex/</guid>
       <description>这可能是最容易理解的 Go Mutex 源码剖析 #  Hi，大家好，我是 haohongfan。
 上一篇文章《一文完全掌握 Go math/rand》，我们知道 math/rand 的 global rand 有一个全局锁，我的文章里面有一句话：“修复方案: 就是把 rrRand 换成了 globalRand, 在线上高并发场景下, 发现全局锁影响并不大.”， 有同学私聊我“他们遇到线上服务的锁竞争特别激烈”。确实我这句话说的并不严谨。但是也让我有了一个思考：到底多高的 QPS 才能让 Mutex 产生强烈的锁竞争 ？
 到底加锁的代码会不会产生线上问题？ 到底该不该使用锁来实现这个功能？线上的问题是不是由于使用了锁造成的？针对这些问题，本文就从源码角度剖析 Go Mutex, 揭开 Mutex 的迷雾。
@@ -20,10 +20,10 @@ Lock #   Unlock #   一些例子 #   一个 goroutine 加锁解锁过程   没�
     
     <item>
       <title>Cond</title>
-      <link>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-10-sync-cond/</link>
+      <link>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-cond/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-10-sync-cond/</guid>
+      <guid>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-cond/</guid>
       <description>这一次，彻底搞懂 Go Cond #  hi，大家好，我是 haohongfan。
 本篇文章会从源码角度去深入剖析下 sync.Cond。Go 日常开发中 sync.Cond 可能是我们用的较少的控制并发的手段，因为大部分场景下都被 Channel 代替了。还有就是 sync.Cond 使用确实也蛮复杂的。
 比如下面这段代码：
@@ -33,10 +33,10 @@ package main import ( &amp;#34;fmt&amp;#34; &amp;#34;sync&amp;#34; &amp;#34;time
     
     <item>
       <title>Sync.Map</title>
-      <link>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-10-sync-map/</link>
+      <link>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-map/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-10-sync-map/</guid>
+      <guid>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-map/</guid>
       <description>看过这篇剖析，你还不懂 Go sync.Map 吗 #  hi, 大家好，我是 haohongfan。
 本篇文章会从使用方式和原码角度剖析 sync.Map。不过不管是日常开发还是开源项目中，好像 sync.Map 并没有得到很好的利用，大家还是习惯使用 Mutex + Map 来使用。
 下面这段代码，看起来很有道理，其实是用错了（背景：并发场景中获取注册信息）。
@@ -47,10 +47,10 @@ instance, ok := instanceMap[name] if ok { return instance, nil } initLock.Lock()
     
     <item>
       <title>WaitGroup</title>
-      <link>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-10-sync-waitgroup/</link>
+      <link>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-waitgroup/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-10-sync-waitgroup/</guid>
+      <guid>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-waitgroup/</guid>
       <description>最清晰易懂的 Go WaitGroup 源码剖析 #  hi，大家好，我是haohongfan。
 本篇主要介绍 WaitGroup 的一些特性，让我们从本质上去了解 WaitGroup。关于 WaitGroup 的基本用法这里就不做过多介绍了。相对于《这可能是最容易理解的 Go Mutex 源码剖析》来说，WaitGroup 就简单的太多了。
 源码剖析 #    type WaitGroup struct { noCopy noCopy state1 [3]uint32 } WaitGroup 底层结构看起来简单，但 WaitGroup.state1 其实代表三个字段：counter，waiter，sema。
@@ -61,10 +61,10 @@ counter ：可以理解为一个计数器，计算经过 wg.Add(N), wg.Done() �
     
     <item>
       <title>sync.Pool</title>
-      <link>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-22-sync-pool/</link>
+      <link>https://www.haohongfan.com/docs/sync-chapter/2021-05-22-sync-pool/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/sync-chapter/2021-05-22-sync-pool/</guid>
+      <guid>https://www.haohongfan.com/docs/sync-chapter/2021-05-22-sync-pool/</guid>
       <description>Go sync.Pool 浅析 #  hi, 大家好，我是 haohongfan。
 sync.Pool 应该是 Go 里面明星级别的数据结构，有很多优秀的文章都在介绍这个结构，本篇文章简单剖析下 sync.Pool。不过说实话 sync.Pool 并不是我们日常开发中使用频率很高的的并发原语。
 尽管用的频率很低，但是不可否认的是 sync.Pool 确实是 Go 的杀手锏，合理使用 sync.Pool 会让我们的程序性能飙升。本篇文章会从使用方式，源码剖析，运用场景等方面，让你对 sync.Pool 有一个清晰的认知。

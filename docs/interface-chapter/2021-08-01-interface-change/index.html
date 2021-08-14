@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="interface 原理剖析 &ndash; 类型转换 #  hi, 大家好，我是 haohognfan。
+可能你看过的 interface 剖析的文章比较多了，这些文章基本都是从汇编角度分析类型转换或者动态转发。不过随着 Go 版本升级，对应的 Go 汇编也发生了巨大的变化，如果单从汇编角度去分析 interface 变的非常有难度，本篇文章我会从内度分配&#43;汇编角度切入 interface，去了解 interface 的原理。
+限于篇幅 interface 有关动态转发和反射的内容，请关注后续的文章。本篇文章主要是关于类型转换，以及相关的容易出现错误的地方。
+  eface #  func main() { var ti interface{} var a int = 100 ti = a fmt.Println(ti) } 这段最常见的代码，现在提出一些问题：
+ 如何查看 ti 是 eface 还是 iface ? 值 100 保存在哪里了 ？ 如何看 ti 的真实的值的类型 ？  大部分源码分析都是从汇编入手来看的，这里也把对应的汇编贴出来
+0x0040 00064 (main.go:44)	MOVQ	$100, (SP) 0x0048 00072 (main.">
+<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="interface" />
+<meta property="og:description" content="interface 原理剖析 &ndash; 类型转换 #  hi, 大家好，我是 haohognfan。
+可能你看过的 interface 剖析的文章比较多了，这些文章基本都是从汇编角度分析类型转换或者动态转发。不过随着 Go 版本升级，对应的 Go 汇编也发生了巨大的变化，如果单从汇编角度去分析 interface 变的非常有难度，本篇文章我会从内度分配&#43;汇编角度切入 interface，去了解 interface 的原理。
+限于篇幅 interface 有关动态转发和反射的内容，请关注后续的文章。本篇文章主要是关于类型转换，以及相关的容易出现错误的地方。
+  eface #  func main() { var ti interface{} var a int = 100 ti = a fmt.Println(ti) } 这段最常见的代码，现在提出一些问题：
+ 如何查看 ti 是 eface 还是 iface ? 值 100 保存在哪里了 ？ 如何看 ti 的真实的值的类型 ？  大部分源码分析都是从汇编入手来看的，这里也把对应的汇编贴出来
+0x0040 00064 (main.go:44)	MOVQ	$100, (SP) 0x0048 00072 (main." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://www.haohongfan.com/docs/interface-chapter/2021-08-01-interface-change/" /><meta property="article:section" content="docs" />
+
+<meta property="article:modified_time" content="2021-08-14T17:49:41&#43;08:00" />
+
+<title>interface | Go 源码分析与实战</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" type="image/x-icon">
+<link rel="stylesheet" href="/book.min.cf5d90d8574af1f10c485912bafecea50887593048830a5d1be5ac171dba0b42.css" integrity="sha256-z12Q2FdK8fEMSFkSuv7OpQiHWTBIgwpdG&#43;WsFx26C0I=" crossorigin="anonymous">
+  <script defer src="/flexsearch.min.js"></script>
+  <script defer src="/en.search.min.5dcae30b74e329a9683b006b84d6f6d8c1c323665617e4e52787bef5acf09876.js" integrity="sha256-XcrjC3TjKaloOwBrhNb22MHDI2ZWF&#43;TlJ4e&#43;9azwmHY=" crossorigin="anonymous"></script>
+
+  <script defer src="/sw.min.6f6f90fcb8eb1c49ec389838e6b801d0de19430b8e516902f8d75c3c8bd98739.js" integrity="sha256-b2&#43;Q/LjrHEnsOJg45rgB0N4ZQwuOUWkC&#43;NdcPIvZhzk=" crossorigin="anonymous"></script>
+<!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+  
+</head>
+<body dir="ltr">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    <aside class="book-menu">
+      <div class="book-menu-content">
+        
+  <nav>
+<h2 class="book-brand">
+  <a href="/"><span>Go 源码分析与实战</span>
+  </a>
+</h2>
+
+
+<div class="book-search">
+  <input type="text" id="book-search-input" placeholder="Search" aria-label="Search" maxlength="64" data-hotkeys="s/" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+
+
+
+
+
+
+  
+<ul>
+  
+  <li>
+    <a href="https://www.haohongfan.com" target="_blank" rel="noopener">
+        HHFCodeRv 博客
+      </a>
+  </li>
+  
+</ul>
+
+
+
+
+
+
+
+  <hr />
+<br />
+<ul>
+<li>
+<p>
+  <a href="/docs/rand-chapter/">随时数</a></p>
+<ul>
+<li>
+  <a href="/docs/rand-chapter/2021-01-23-rand/">Math/rand</a></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/docs/sync-chapter/">并发原语</a></p>
+<ul>
+<li>
+  <a href="/docs/sync-chapter/2021-04-01-mutex/">sync.Mutex</a></li>
+<li>
+  <a href="/docs/sync-chapter/2021-05-10-sync-cond/">sync.Cond</a></li>
+<li>
+  <a href="/docs/sync-chapter/2021-05-10-sync-map/">sync.Map</a></li>
+<li>
+  <a href="/docs/sync-chapter/2021-05-10-sync-waitgroup/">sync.WaitGroup</a></li>
+<li>
+  <a href="/docs/sync-chapter/2021-05-22-sync-pool/">sync.Pool</a></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/docs/timer-chapter/">定时器</a></p>
+<ul>
+<li>
+  <a href="/docs/timer-chapter/2021-04-01-timer/">Timer</a></li>
+</ul>
+</li>
+<li>
+<p>
+  <a href="/docs/interface-chapter/">interface 原理剖析</a></p>
+<ul>
+<li>
+  <a href="/docs/interface-chapter/2021-08-01-interface-change/"class=active>类型转换</a></li>
+</ul>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var a=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(b){localStorage.setItem("menu.scrollTop",a.scrollTop)}),a.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+ 
+      </div>
+    </aside>
+
+    <div class="book-page">
+      <header class="book-header">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <strong>interface</strong>
+
+  <label for="toc-control">
+    
+    <img src="/svg/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden clearfix">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#interface-原理剖析----类型转换">interface 原理剖析 &ndash; 类型转换</a>
+      <ul>
+        <li><a href="#eface">eface</a></li>
+        <li><a href="#iface">iface</a>
+          <ul>
+            <li><a href="#类型断言">类型断言</a></li>
+            <li><a href="#坑">坑</a></li>
+            <li><a href="#关于-interface-源码阅读的一点建议">关于 interface 源码阅读的一点建议</a></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown"><h1 id="interface-原理剖析----类型转换">
+  interface 原理剖析 &ndash; 类型转换
+  <a class="anchor" href="#interface-%e5%8e%9f%e7%90%86%e5%89%96%e6%9e%90----%e7%b1%bb%e5%9e%8b%e8%bd%ac%e6%8d%a2">#</a>
+</h1>
+<p>hi, 大家好，我是 haohognfan。</p>
+<p>可能你看过的 interface 剖析的文章比较多了，这些文章基本都是从汇编角度分析类型转换或者动态转发。不过随着 Go 版本升级，对应的 Go 汇编也发生了巨大的变化，如果单从汇编角度去分析 interface 变的非常有难度，本篇文章我会从<strong>内度分配+汇编</strong>角度切入 interface，去了解 interface 的原理。</p>
+<p>限于篇幅 interface 有关动态转发和反射的内容，请关注后续的文章。本篇文章主要是关于类型转换，以及相关的容易出现错误的地方。</p>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/eface.png" alt="eface" /></p>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/iface.png" alt="iface" /></p>
+<h2 id="eface">
+  eface
+  <a class="anchor" href="#eface">#</a>
+</h2>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+	  <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">ti</span> <span style="color:#66d9ef">interface</span>{}
+	  <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">a</span> <span style="color:#66d9ef">int</span> = <span style="color:#ae81ff">100</span>
+	  <span style="color:#a6e22e">ti</span> = <span style="color:#a6e22e">a</span>
+	  <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#a6e22e">ti</span>)
+}
+</code></pre></div><p>这段最常见的代码，现在提出一些问题：</p>
+<ul>
+<li>如何查看 ti 是 eface 还是 iface ?</li>
+<li>值 100 保存在哪里了 ？</li>
+<li>如何看 ti 的真实的值的类型 ？</li>
+</ul>
+<p>大部分源码分析都是从汇编入手来看的，这里也把对应的汇编贴出来</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-s" data-lang="s"><span style="color:#ae81ff">0x0040</span> <span style="color:#ae81ff">00064</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	MOVQ	<span style="color:#f92672">$</span><span style="color:#ae81ff">100</span>, (SP)
+<span style="color:#ae81ff">0x0048</span> <span style="color:#ae81ff">00072</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	CALL	<span style="color:#a6e22e">runtime.convT64</span>(SB)
+<span style="color:#ae81ff">0x004d</span> <span style="color:#ae81ff">00077</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	MOVQ	<span style="color:#ae81ff">8</span>(SP), AX
+<span style="color:#ae81ff">0x0052</span> <span style="color:#ae81ff">00082</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	MOVQ	AX, <span style="color:#e6db74">&#34;&#34;</span>..autotmp_3<span style="color:#ae81ff">+64</span>(SP)
+<span style="color:#ae81ff">0x0057</span> <span style="color:#ae81ff">00087</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	LEAQ	<span style="color:#a6e22e">type.int</span>(SB), CX
+<span style="color:#ae81ff">0x005e</span> <span style="color:#ae81ff">00094</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	MOVQ	CX, <span style="color:#e6db74">&#34;&#34;</span>.ti<span style="color:#ae81ff">+72</span>(SP)
+<span style="color:#ae81ff">0x0063</span> <span style="color:#ae81ff">00099</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">44</span>)	MOVQ	AX, <span style="color:#e6db74">&#34;&#34;</span>.ti<span style="color:#ae81ff">+80</span>(SP)
+</code></pre></div><p>这段汇编有下面这些特点：</p>
+<ul>
+<li>CALL runtime.convT64(SB)：将 100 作为 runtime.convT64 的参数，该函数申请了一段内存，将 100 放入了这段内存里</li>
+<li>将类型 type.int 放入到 SP+72 的位置</li>
+<li>将包含 100 的那块内存的指针，放入到 SP + 80 的位置</li>
+</ul>
+<p>这段汇编从直观上来说，interface 转换成 eface 是看不出来的。这个如何观察呢？这个就需要借助 gdb 了。</p>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/eface_gdb.png" alt="" /></p>
+<p>再继续深究下，如何利用内存分布来验证是 eface 呢？需要另外再添加点代码。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">eface</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">_type</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">_type</span>
+    <span style="color:#a6e22e">data</span>  <span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>
+}
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">_type</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">size</span>       <span style="color:#66d9ef">uintptr</span>
+    <span style="color:#a6e22e">ptrdata</span>    <span style="color:#66d9ef">uintptr</span> <span style="color:#75715e">// size of memory prefix holding all pointers
+</span><span style="color:#75715e"></span>    <span style="color:#a6e22e">hash</span>       <span style="color:#66d9ef">uint32</span>
+    <span style="color:#a6e22e">tflag</span>      <span style="color:#a6e22e">tflag</span>
+    <span style="color:#a6e22e">align</span>      <span style="color:#66d9ef">uint8</span>
+    <span style="color:#a6e22e">fieldAlign</span> <span style="color:#66d9ef">uint8</span>
+    <span style="color:#a6e22e">kind</span>       <span style="color:#66d9ef">uint8</span>
+    <span style="color:#a6e22e">equal</span>      <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>, <span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>) <span style="color:#66d9ef">bool</span>
+    <span style="color:#a6e22e">gcdata</span>     <span style="color:#f92672">*</span><span style="color:#66d9ef">byte</span>
+    <span style="color:#a6e22e">str</span>        <span style="color:#a6e22e">nameOff</span>
+    <span style="color:#a6e22e">ptrToThis</span>  <span style="color:#a6e22e">typeOff</span>
+}
+
+<span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">ti</span> <span style="color:#66d9ef">interface</span>{}
+    <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">a</span> <span style="color:#66d9ef">int</span> = <span style="color:#ae81ff">100</span>
+    <span style="color:#a6e22e">ti</span> = <span style="color:#a6e22e">a</span>
+
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;type:&#34;</span>, <span style="color:#f92672">*</span>(<span style="color:#f92672">*</span><span style="color:#a6e22e">eface</span>)(<span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">ti</span>)).<span style="color:#a6e22e">_type</span>)
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;data:&#34;</span>, <span style="color:#f92672">*</span>(<span style="color:#f92672">*</span><span style="color:#66d9ef">int</span>)((<span style="color:#f92672">*</span><span style="color:#a6e22e">eface</span>)(<span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">ti</span>)).<span style="color:#a6e22e">data</span>))
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>((<span style="color:#f92672">*</span><span style="color:#a6e22e">eface</span>)(<span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">ti</span>)))
+}
+</code></pre></div><p>output:</p>
+<pre><code>type: {8 0 4149441018 15 8 8 2 0x10032e0 0x10e6b60 959 27232}
+data: 100
+&amp;{0x10ade20 0x1155bc0}
+</code></pre><p>从这个结果上能够看出来</p>
+<ul>
+<li>eface.kind = 2, 对应着 runtime.kindInt</li>
+<li>eface.data = 100</li>
+</ul>
+<p>从内存上分配上看，我们基本看出来了 eface 的内存布局及对应的最终的 eface 的类型转换结果。</p>
+<h2 id="iface">
+  iface
+  <a class="anchor" href="#iface">#</a>
+</h2>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#f92672">package</span> <span style="color:#a6e22e">main</span>
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Person</span> <span style="color:#66d9ef">interface</span> {
+	  <span style="color:#a6e22e">Say</span>() <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Man</span> <span style="color:#66d9ef">struct</span> {
+}
+
+<span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">Man</span>) <span style="color:#a6e22e">Say</span>() <span style="color:#66d9ef">string</span> {
+	  <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;Man&#34;</span>
+}
+
+<span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">p</span> <span style="color:#a6e22e">Person</span>
+
+    <span style="color:#a6e22e">m</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">Man</span>{}
+    <span style="color:#a6e22e">p</span> = <span style="color:#a6e22e">m</span>
+    println(<span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">Say</span>())
+}
+
+</code></pre></div><p>iface 我们也看下汇编：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-s" data-lang="s"><span style="color:#ae81ff">0x0029</span> <span style="color:#ae81ff">00041</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">24</span>)	LEAQ	<span style="color:#a6e22e">runtime.zerobase</span>(SB), AX
+<span style="color:#ae81ff">0x0030</span> <span style="color:#ae81ff">00048</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">24</span>)	MOVQ	AX, <span style="color:#e6db74">&#34;&#34;</span>..autotmp_6<span style="color:#ae81ff">+48</span>(SP)
+<span style="color:#ae81ff">0x0035</span> <span style="color:#ae81ff">00053</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">24</span>)	MOVQ	AX, <span style="color:#e6db74">&#34;&#34;</span>.m<span style="color:#ae81ff">+32</span>(SP)
+<span style="color:#ae81ff">0x003a</span> <span style="color:#ae81ff">00058</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">25</span>)	MOVQ	AX, <span style="color:#e6db74">&#34;&#34;</span>..autotmp_3<span style="color:#ae81ff">+64</span>(SP)
+<span style="color:#ae81ff">0x003f</span> <span style="color:#ae81ff">00063</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">25</span>)	LEAQ	go.itab.<span style="color:#f92672">*</span><span style="color:#e6db74">&#34;&#34;</span>.Man,<span style="color:#e6db74">&#34;&#34;</span><span style="color:#a6e22e">.Person</span>(SB), CX
+<span style="color:#ae81ff">0x0046</span> <span style="color:#ae81ff">00070</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">25</span>)	MOVQ	CX, <span style="color:#e6db74">&#34;&#34;</span>.p<span style="color:#ae81ff">+72</span>(SP)
+<span style="color:#ae81ff">0x004b</span> <span style="color:#ae81ff">00075</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">25</span>)	MOVQ	AX, <span style="color:#e6db74">&#34;&#34;</span>.p<span style="color:#ae81ff">+80</span>(SP)
+</code></pre></div><p>这段汇编上，能够看出来是有 itab 的，但是是否真的是转成了 iface，汇编上仍然反应不出来。</p>
+<p>同样，我们继续用 gdb 查看 Person interface 确实被转换成了 iface。
+
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/iface_gdb.png" alt="" /></p>
+<p>关于 iface 内存布局，我们仍然加点代码来查看</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">itab</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">inter</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">interfacetype</span>
+    <span style="color:#a6e22e">_type</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">_type</span>
+    <span style="color:#a6e22e">hash</span>  <span style="color:#66d9ef">uint32</span>
+    <span style="color:#a6e22e">_</span>     [<span style="color:#ae81ff">4</span>]<span style="color:#66d9ef">byte</span>
+    <span style="color:#a6e22e">fun</span>   [<span style="color:#ae81ff">1</span>]<span style="color:#66d9ef">uintptr</span>
+}
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">iface</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">tab</span>  <span style="color:#f92672">*</span><span style="color:#a6e22e">itab</span>
+    <span style="color:#a6e22e">data</span> <span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>
+}
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Person</span> <span style="color:#66d9ef">interface</span> {
+    <span style="color:#a6e22e">Say</span>() <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Man</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">Name</span> <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">Man</span>) <span style="color:#a6e22e">Say</span>() <span style="color:#66d9ef">string</span> {
+    <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;Man&#34;</span>
+}
+
+<span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">p</span> <span style="color:#a6e22e">Person</span>
+
+    <span style="color:#a6e22e">m</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">Man</span>{<span style="color:#a6e22e">Name</span>: <span style="color:#e6db74">&#34;hhf&#34;</span>}
+    <span style="color:#a6e22e">p</span> = <span style="color:#a6e22e">m</span>
+    println(<span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">Say</span>())
+
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;itab:&#34;</span>, <span style="color:#f92672">*</span>(<span style="color:#f92672">*</span><span style="color:#a6e22e">iface</span>)(<span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">p</span>)).<span style="color:#a6e22e">tab</span>)
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;data:&#34;</span>, <span style="color:#f92672">*</span>(<span style="color:#f92672">*</span><span style="color:#a6e22e">Man</span>)((<span style="color:#f92672">*</span><span style="color:#a6e22e">iface</span>)(<span style="color:#a6e22e">unsafe</span>.<span style="color:#a6e22e">Pointer</span>(<span style="color:#f92672">&amp;</span><span style="color:#a6e22e">p</span>)).<span style="color:#a6e22e">data</span>))
+}
+</code></pre></div><p>output:</p>
+<pre><code>Man
+itab: {0x10b3ba0 0x10b1900 1224794265 [0 0 0 0] [17445152]}
+data: {hhf}
+</code></pre><p>关于想继续探究 eface, iface 的内存布局的同学，可以基于上面的代码，利用 unsafe 的相关函数去看对应的内存位置上的值。</p>
+<h3 id="类型断言">
+  类型断言
+  <a class="anchor" href="#%e7%b1%bb%e5%9e%8b%e6%96%ad%e8%a8%80">#</a>
+</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Person</span> <span style="color:#66d9ef">interface</span> {
+	  <span style="color:#a6e22e">Say</span>() <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Man</span> <span style="color:#66d9ef">struct</span> {
+	  <span style="color:#a6e22e">Name</span> <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">m</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">Man</span>) <span style="color:#a6e22e">Say</span>() <span style="color:#66d9ef">string</span> {
+	  <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;Man&#34;</span>
+}
+
+<span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+	  <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">p</span> <span style="color:#a6e22e">Person</span>
+
+    <span style="color:#a6e22e">m</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">Man</span>{<span style="color:#a6e22e">Name</span>: <span style="color:#e6db74">&#34;hhf&#34;</span>}
+    <span style="color:#a6e22e">p</span> = <span style="color:#a6e22e">m</span>
+
+    <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">m1</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">p</span>.(<span style="color:#f92672">*</span><span style="color:#a6e22e">Man</span>); <span style="color:#a6e22e">ok</span> {
+      <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#a6e22e">m1</span>.<span style="color:#a6e22e">Name</span>)
+    }
+}
+</code></pre></div><p>我们仅关注类型断言那块内容，贴出对应的汇编</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-s" data-lang="s"><span style="color:#ae81ff">0x0087</span> <span style="color:#ae81ff">00135</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">23</span>)	MOVQ	<span style="color:#e6db74">&#34;&#34;</span>.p<span style="color:#ae81ff">+104</span>(SP), AX
+<span style="color:#ae81ff">0x008c</span> <span style="color:#ae81ff">00140</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">23</span>)	MOVQ	<span style="color:#e6db74">&#34;&#34;</span>.p<span style="color:#ae81ff">+112</span>(SP), CX
+<span style="color:#ae81ff">0x0091</span> <span style="color:#ae81ff">00145</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">23</span>)	LEAQ	go.itab.<span style="color:#f92672">*</span><span style="color:#e6db74">&#34;&#34;</span>.Man,<span style="color:#e6db74">&#34;&#34;</span><span style="color:#a6e22e">.Person</span>(SB), DX
+<span style="color:#ae81ff">0x0098</span> <span style="color:#ae81ff">00152</span> (main.go<span style="color:#f92672">:</span><span style="color:#ae81ff">23</span>)	CMPQ	DX, AX
+</code></pre></div><p>能够看出来的是：将 iface.itab 放入了 AX，将 <code>go.itab.*&quot;&quot;.Man,&quot;&quot;.Person(SB)</code> 放入了 DX，比较两者是否相等，来判断 Person 的真实类型是否是 Man。</p>
+<p>另外一个类型断言的方式就是 switch 了，其实两者本质上没啥区别。</p>
+<h3 id="坑">
+  坑
+  <a class="anchor" href="#%e5%9d%91">#</a>
+</h3>
+<p>interface 最著名的坑的，应该就是下面这个了。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+    <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">a</span> <span style="color:#66d9ef">interface</span>{} = <span style="color:#66d9ef">nil</span>
+    <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">b</span> <span style="color:#f92672">*</span><span style="color:#66d9ef">int</span> = <span style="color:#66d9ef">nil</span>
+    
+    <span style="color:#a6e22e">isNil</span>(<span style="color:#a6e22e">a</span>)
+    <span style="color:#a6e22e">isNil</span>(<span style="color:#a6e22e">b</span>)
+}
+
+<span style="color:#66d9ef">func</span> <span style="color:#a6e22e">isNil</span>(<span style="color:#a6e22e">x</span> <span style="color:#66d9ef">interface</span>{}) {
+    <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">x</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+      <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;empty interface&#34;</span>)
+      <span style="color:#66d9ef">return</span>
+    }
+    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;non-empty interface&#34;</span>)
+}
+</code></pre></div><p>output:</p>
+<pre><code>empty interface
+non-empty interface
+</code></pre><p>为什么会这样呢？这就涉及到 interface == nil 的判断方式了。一般情况只有 eface 的 type 和 data 都为 nil 时，interface == nil 才是 true。</p>
+<p>当我们把 b 复制给 interface 时，x._type.Kind = kindPtr。虽说 x.data = nil，但是不符合 interface == nil 的判断条件了。</p>
+<h3 id="关于-interface-源码阅读的一点建议">
+  关于 interface 源码阅读的一点建议
+  <a class="anchor" href="#%e5%85%b3%e4%ba%8e-interface-%e6%ba%90%e7%a0%81%e9%98%85%e8%af%bb%e7%9a%84%e4%b8%80%e7%82%b9%e5%bb%ba%e8%ae%ae">#</a>
+</h3>
+<p>关于 interface 源码阅读的一点建议，如果想利用汇编看源码的话，尽量选择 go1.14.x。</p>
+<p>选择 Go 汇编来看 interface，基本上也是为了查看 interface 最终被转换成 eface 还是 iface，调用了 runtime 的哪些函数，以及对应的函数栈分布。如果 Go 版本选择的太高的话，go 汇编变化太大了，可能汇编上就看不到对应的内容了。</p>
+<p>更多学习学习资料分享，关注公众号回复指令：</p>
+<ul>
+<li>回复 0，获取 《Go 面经》</li>
+<li>回复 1，获取 《Go 源码流程图》</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/me.png" alt="" /></p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+
+
+  <div><a class="flex align-center" href="https://github.com/alex-shpak/hugo-book/commit/992a3642760a30829ccf28a7abce5678db8d88f6" title='Last modified by georgehao | August 14, 2021' target="_blank" rel="noopener">
+      <img src="/svg/calendar.svg" class="book-icon" alt="Calendar" />
+      <span>August 14, 2021</span>
+    </a>
+  </div>
+
+
+
+</div>
+
+
+
+  <script>(function(){function a(c){const a=window.getSelection(),b=document.createRange();b.selectNodeContents(c),a.removeAllRanges(),a.addRange(b)}document.querySelectorAll("pre code").forEach(b=>{b.addEventListener("click",function(c){a(b.parentElement),navigator.clipboard&&navigator.clipboard.writeText(b.parentElement.textContent)})})})()</script>
+
+
+<footer id="footer">
+    <div class="container">
+		<div>
+		以上内容均不得复制用于商业用途或发行
+		</div>
+		<br/>
+        &copy; 2015-2021, By haohongfan Licensed under CC-BY-NC-ND 4.0</a>。
+        备案号：<a href="http://www.beian.miit.gov.cn" target="_blank">京ICP备17041575号</a>
+        
+    </div>
+</footer>
+
+ 
+        
+      </footer>
+
+      
+  
+  <div class="book-comments">
+
+
+<br>
+<hr color="#D6D6D6" size=0>
+<script src="https://utteranc.es/client.js"
+        repo="georgehao/oblog"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+</div>
+  
+ 
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+    <aside class="book-toc">
+      <div class="book-toc-content">
+        
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#interface-原理剖析----类型转换">interface 原理剖析 &ndash; 类型转换</a>
+      <ul>
+        <li><a href="#eface">eface</a></li>
+        <li><a href="#iface">iface</a>
+          <ul>
+            <li><a href="#类型断言">类型断言</a></li>
+            <li><a href="#坑">坑</a></li>
+            <li><a href="#关于-interface-源码阅读的一点建议">关于 interface 源码阅读的一点建议</a></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+
+
+ 
+      </div>
+    </aside>
+    
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

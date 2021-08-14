@@ -1,16 +1,51 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  
-  <sitemap>
-    <loc>https://gohandbook.haohongfan.com/zh/sitemap.xml</loc>
-    
-  </sitemap>
-  
-  <sitemap>
-    <loc>https://gohandbook.haohongfan.com/en/sitemap.xml</loc>
-    
-      <lastmod>2021-06-25T17:20:28+08:00</lastmod>
-    
-  </sitemap>
-  
-</sitemapindex>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://www.haohongfan.com/docs/interface-chapter/2021-08-01-interface-change/</loc>
+    <lastmod>2021-08-14T17:49:41+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/rand-chapter/2021-01-23-rand/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/sync-chapter/2021-04-01-mutex/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/timer-chapter/2021-04-01-timer/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/rand-chapter/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-cond/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/sync-chapter/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-map/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/timer-chapter/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/interface-chapter/</loc>
+    <lastmod>2021-08-14T17:49:41+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/sync-chapter/2021-05-10-sync-waitgroup/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/sync-chapter/2021-05-22-sync-pool/</loc>
+    <lastmod>2021-06-25T17:20:28+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/categories/</loc>
+  </url><url>
+    <loc>https://www.haohongfan.com/docs/</loc>
+    <lastmod>2021-08-14T17:49:41+08:00</lastmod>
+  </url><url>
+    <loc>https://www.haohongfan.com/tags/</loc>
+  </url><url>
+    <loc>https://www.haohongfan.com/</loc>
+    <lastmod>2021-06-25T17:32:29+08:00</lastmod>
+  </url>
+</urlset>

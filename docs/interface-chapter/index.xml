@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>interface 原理 on Go 源码分析与实战</title>
+    <link>https://www.haohongfan.com/docs/interface-chapter/</link>
+    <description>Recent content in interface 原理 on Go 源码分析与实战</description>
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://www.haohongfan.com/docs/interface-chapter/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>interface</title>
+      <link>https://www.haohongfan.com/docs/interface-chapter/2021-08-01-interface-change/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://www.haohongfan.com/docs/interface-chapter/2021-08-01-interface-change/</guid>
+      <description>interface 原理剖析 &amp;ndash; 类型转换 #  hi, 大家好，我是 haohognfan。
+可能你看过的 interface 剖析的文章比较多了，这些文章基本都是从汇编角度分析类型转换或者动态转发。不过随着 Go 版本升级，对应的 Go 汇编也发生了巨大的变化，如果单从汇编角度去分析 interface 变的非常有难度，本篇文章我会从内度分配+汇编角度切入 interface，去了解 interface 的原理。
+限于篇幅 interface 有关动态转发和反射的内容，请关注后续的文章。本篇文章主要是关于类型转换，以及相关的容易出现错误的地方。
+  eface #  func main() { var ti interface{} var a int = 100 ti = a fmt.Println(ti) } 这段最常见的代码，现在提出一些问题：
+ 如何查看 ti 是 eface 还是 iface ? 值 100 保存在哪里了 ？ 如何看 ti 的真实的值的类型 ？  大部分源码分析都是从汇编入手来看的，这里也把对应的汇编贴出来
+0x0040 00064 (main.go:44)	MOVQ	$100, (SP) 0x0048 00072 (main.</description>
+    </item>
+    
+  </channel>
+</rss>

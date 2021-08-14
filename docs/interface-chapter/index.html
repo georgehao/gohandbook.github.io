@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="">
-<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="Docs" />
+<meta name="description" content="本章节是对 golang interface 的解析
+  类型转换  更多学习学习资料分享，关注公众号回复指令：
+ 回复 0，获取 《Go 面经》 回复 1，获取 《Go 源码流程图》   ">
+<meta name="theme-color" content="#FFFFFF"><meta property="og:title" content="interface 原理" />
 <meta property="og:description" content="" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://www.haohongfan.com/docs/" />
+<meta property="og:url" content="https://www.haohongfan.com/docs/interface-chapter/" />
 
-<title>Docs | Go 源码分析与实战</title>
+<title>interface 原理 | Go 源码分析与实战</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/favicon.png" type="image/x-icon">
 <link rel="stylesheet" href="/book.min.cf5d90d8574af1f10c485912bafecea50887593048830a5d1be5ac171dba0b42.css" integrity="sha256-z12Q2FdK8fEMSFkSuv7OpQiHWTBIgwpdG&#43;WsFx26C0I=" crossorigin="anonymous">
@@ -17,7 +19,7 @@
   <script defer src="/en.search.min.5dcae30b74e329a9683b006b84d6f6d8c1c323665617e4e52787bef5acf09876.js" integrity="sha256-XcrjC3TjKaloOwBrhNb22MHDI2ZWF&#43;TlJ4e&#43;9azwmHY=" crossorigin="anonymous"></script>
 
   <script defer src="/sw.min.6f6f90fcb8eb1c49ec389838e6b801d0de19430b8e516902f8d75c3c8bd98739.js" integrity="sha256-b2&#43;Q/LjrHEnsOJg45rgB0N4ZQwuOUWkC&#43;NdcPIvZhzk=" crossorigin="anonymous"></script>
-<link rel="alternate" type="application/rss+xml" href="https://www.haohongfan.com/docs/index.xml" title="Go 源码分析与实战" />
+<link rel="alternate" type="application/rss+xml" href="https://www.haohongfan.com/docs/interface-chapter/index.xml" title="Go 源码分析与实战" />
 <!--
 Made with Book Theme
 https://github.com/alex-shpak/hugo-book
@@ -103,7 +105,7 @@ https://github.com/alex-shpak/hugo-book
 </li>
 <li>
 <p>
-  <a href="/docs/interface-chapter/">interface 原理剖析</a></p>
+  <a href="/docs/interface-chapter/"class=active>interface 原理剖析</a></p>
 <ul>
 <li>
   <a href="/docs/interface-chapter/2021-08-01-interface-change/">类型转换</a></li>
@@ -140,7 +142,7 @@ https://github.com/alex-shpak/hugo-book
     <img src="/svg/menu.svg" class="book-icon" alt="Menu" />
   </label>
 
-  <strong>Docs</strong>
+  <strong>interface 原理</strong>
 
   <label for="toc-control">
     
@@ -154,7 +156,7 @@ https://github.com/alex-shpak/hugo-book
   <aside class="hidden clearfix">
     
   
-
+<nav id="TableOfContents"></nav>
 
 
 
@@ -165,7 +167,19 @@ https://github.com/alex-shpak/hugo-book
 
       
       
-  <article class="markdown"></article>
+  <article class="markdown"><p>本章节是对 golang interface 的解析</p>
+<ol>
+<li>
+  <a href="/docs/interface-chapter/2021-08-01-interface-change/">类型转换</a></li>
+</ol>
+<p>更多学习学习资料分享，关注公众号回复指令：</p>
+<ul>
+<li>回复 0，获取 《Go 面经》</li>
+<li>回复 1，获取 《Go 源码流程图》</li>
+</ul>
+<p>
+  <img src="https://cdn.jsdelivr.net/gh/georgehao/img/me.png" alt="" /></p>
+</article>
  
       
 
@@ -174,6 +188,12 @@ https://github.com/alex-shpak/hugo-book
   <div class="flex flex-wrap justify-between">
 
 
+
+  <div><a class="flex align-center" href="https://github.com/alex-shpak/hugo-book/commit/992a3642760a30829ccf28a7abce5678db8d88f6" title='Last modified by georgehao | August 14, 2021' target="_blank" rel="noopener">
+      <img src="/svg/calendar.svg" class="book-icon" alt="Calendar" />
+      <span>August 14, 2021</span>
+    </a>
+  </div>
 
 
 
@@ -202,6 +222,21 @@ https://github.com/alex-shpak/hugo-book
 
       
   
+  <div class="book-comments">
+
+
+<br>
+<hr color="#D6D6D6" size=0>
+<script src="https://utteranc.es/client.js"
+        repo="georgehao/oblog"
+        issue-term="pathname"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+</div>
+  
  
 
       <label for="menu-control" class="hidden book-menu-overlay"></label>
@@ -212,7 +247,7 @@ https://github.com/alex-shpak/hugo-book
       <div class="book-toc-content">
         
   
-
+<nav id="TableOfContents"></nav>
 
 
  

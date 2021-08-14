@@ -2,15 +2,15 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>定时器 on Go 源码分析与实战</title>
-    <link>https://gohandbook.haohongfan.com/docs/timer-chapter/</link>
+    <link>https://www.haohongfan.com/docs/timer-chapter/</link>
     <description>Recent content in 定时器 on Go 源码分析与实战</description>
-    <generator>Hugo -- gohugo.io</generator><atom:link href="https://gohandbook.haohongfan.com/docs/timer-chapter/index.xml" rel="self" type="application/rss+xml" />
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://www.haohongfan.com/docs/timer-chapter/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Timer</title>
-      <link>https://gohandbook.haohongfan.com/docs/timer-chapter/2021-04-01-timer/</link>
+      <link>https://www.haohongfan.com/docs/timer-chapter/2021-04-01-timer/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/timer-chapter/2021-04-01-timer/</guid>
+      <guid>https://www.haohongfan.com/docs/timer-chapter/2021-04-01-timer/</guid>
       <description>Go timer 是如何被调度的？ #  hi，大家好，我是 haohongfan。
 本篇文章剖析下 Go 定时器的相关内容。定时器不管是业务开发，还是基础架构开发，都是绕不过去的存在，由此可见定时器的重要程度。
 我们不管用 NewTimer, timer.After，还是 timer.AfterFun 来初始化一个 timer, 这个 timer 最终都会加入到一个全局 timer 堆中，由 Go runtime 统一管理。

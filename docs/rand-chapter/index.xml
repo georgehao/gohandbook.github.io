@@ -2,15 +2,15 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>随机数 on Go 源码分析与实战</title>
-    <link>https://gohandbook.haohongfan.com/docs/rand-chapter/</link>
+    <link>https://www.haohongfan.com/docs/rand-chapter/</link>
     <description>Recent content in 随机数 on Go 源码分析与实战</description>
-    <generator>Hugo -- gohugo.io</generator><atom:link href="https://gohandbook.haohongfan.com/docs/rand-chapter/index.xml" rel="self" type="application/rss+xml" />
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://www.haohongfan.com/docs/rand-chapter/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Math/rand</title>
-      <link>https://gohandbook.haohongfan.com/docs/rand-chapter/2021-01-23-rand/</link>
+      <link>https://www.haohongfan.com/docs/rand-chapter/2021-01-23-rand/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://gohandbook.haohongfan.com/docs/rand-chapter/2021-01-23-rand/</guid>
+      <guid>https://www.haohongfan.com/docs/rand-chapter/2021-01-23-rand/</guid>
       <description>一文完全掌握 Go math/rand #  Go 获取随机数是开发中经常会用到的功能, 不过这个里面还是有一些坑存在的, 本文将完全剖析 Go math/rand, 让你轻松使用 Go Rand.
 开篇一问: 你觉得 rand 会 panic 吗 ?
  源码剖析 #  math/rand 源码其实很简单, 就两个比较重要的函数
